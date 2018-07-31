@@ -205,30 +205,34 @@ type ThreeDVector
     x :: Float64
     y :: Float64
     z :: Float64
+
+    function ThreeDVector(x_ :: T1, y_ :: T2, z_ :: T3) where
+        {T1 <: Real, T2 <: Real,  T3 <: Real}
+        new(x_, y_, z_)
+    end
+
+    function ThreeDVector(array :: Vector{T}) where T <: Real
+        @assert(size(array)[1] == 3)
+        x = Float64(array[1])
+        y = Float64(array[2])
+        z = Float64(array[3])
+        new(x, y, z)
+    end
 end
 
-import Base.convert
 """ Convert type ThreeDVector to Array{Float64}"""
-function convert(::Type(Array{Float64, 1}), a::ThreeDVector)
+function convert(::Type{Array{T, 1}}, a::ThreeDVector) where T <: Real
     return [a.x, a.y, a.z]
 end
 
-""" Convert type Array{Float64} to ThreeDVector"""
-function convert(::Type{ThreeDVector}, a::Array{Float64, 1})
+""" Convert type Array{Real} to ThreeDVector"""
+function convert(::Type{ThreeDVector}, a::Array{T, 1}) where T<: Real
     @assert(size(a)[1] == 3)
     b = ThreeDVector(a[1], a[2], a[3])
     return b
 end
 
-""" Convert type Array{Int64} to ThreeDVector"""
-function convert(::Type{ThreeDVector}, a::Array{Float64, 1})
-    @assert(size(a)[1] == 3)
-    b = ThreeDVector(Float64(a[1]), Float64(a[2]), Float64(a[3]))
-    return b
-end
-
-import Base.+
-function +(a::ThreeDVector, b::ThreeDVector)
+function Base.:+(a::ThreeDVector, b::ThreeDVector)
     c = ThreeDVector([
         a.x + b.x,
         a.y + b.y,
@@ -236,14 +240,12 @@ function +(a::ThreeDVector, b::ThreeDVector)
     return c
 end
 
-import Base.-
-function -(a::ThreeDVector, b::ThreeDVector)
+function Base.:-(a::ThreeDVector, b::ThreeDVector)
     c = ThreeDVector([a.x - b.x, a.y - b.y, a.z - b.z])
     return c
 end
 
-import Base.*
-function *(a::ThreeDVector, b::Float64)
+function Base.:*(a::ThreeDVector, b::T) where T <: Real
     c = ThreeDVector([
         a.x * b,
         a.y * b,
@@ -251,12 +253,11 @@ function *(a::ThreeDVector, b::Float64)
     return c
 end
 
-function *(a::Float64, b::ThreeDVector)
+function Base.:*(a::T, b::ThreeDVector) where T <: Real
     return b * a
 end
 
-import Base./
-function /(a::ThreeDVector, b::Float64)
+function Base.:/(a::ThreeDVector, b::T) where T <: Real
     c = ThreeDVector([
         a.x / b,
         a.y / b,
@@ -278,7 +279,7 @@ function dot(a::ThreeDVector, b::ThreeDVector)
     return a.x * b.x + a.y * b.y + a.z * b.z
 end
 
-function abs(a::ThreeDVector)
+function Base.abs(a::ThreeDVector)
     return sqrt(a.x^2 + a.y^2 + a.z^2)
 end
 
@@ -305,8 +306,7 @@ function unit!(a::ThreeDVector)
     return Void
 end
 
-import Base.getindex
-function getindex(a::ThreeDVector, i::Int64)
+function Base.getindex(a::ThreeDVector, i::Int)  where Int <: Integer
     if i == 1 return a.x
     elseif i == 2 return a.y
     elseif i == 3 return a.z
@@ -314,10 +314,13 @@ function getindex(a::ThreeDVector, i::Int64)
     end
 end
 
-function size(a::ThreeDVector)
+function Base.size(a::ThreeDVector)
     return [3]
 end
 
+function Base.isfinite(a::ThreeDVector)
+    return isfinite(a.x) && isfinite(a.y) && isfinite(a.z)
+end
 #= END ThreeDVector ----------------------------------------------------------=#
 
 #===============================================================================
@@ -472,3 +475,499 @@ function particle_rate_of_change_of_vorticity(
     return vel
 end
 #= END ThreeDVortexParticle --------------------------------------------------=#
+
+#===============================================================================
+    ThreeDStraightVortexFilament
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type ThreeDStraightVortexFilament
+    start_coord :: ThreeDVector
+    end_coord :: ThreeDVector
+    vorticity :: Float64
+
+    function ThreeDStraightVortexFilament(
+        start_coord :: ThreeDVector,
+        end_coord :: ThreeDVector,
+        vorticity :: T
+        ) where T <: Real
+        new(start_coord, end_coord, Float64(vorticity))
+    end
+end
+
+function ThreeDStraightVortexFilament(
+    start_coord :: ThreeDVector,
+    end_coord :: ThreeDVector
+    )
+    return ThreeDStraightVortexFilament(start_coord, end_coord, 0.0)
+end
+
+ThreeDStraightVortexFilament() =
+    ThreeDStraightVortexFilament(
+        ThreeDVector([0., 0., 0.]),
+        ThreeDVector([1., 1., 1.]),
+        0.0)
+#= END ThreeDStraightVortexFilament ------------------------------------------=#
+
+#===============================================================================
+    ThreeDVortexParticleSet
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type ThreeDVortexParticleSet
+    particles :: Vector{ThreeDVortexParticle}
+
+    _reduction_factor_fn :: Function
+    _vorticity_fraction_fn :: Function
+end
+#= END ThreeDVortexParticleSet -----------------------------------------------=#
+
+
+#===============================================================================
+    WingChordSection
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type WingChordSection
+    # Define the locations of the strips used in the analysis:
+    LE_location :: ThreeDVector
+    TE_location :: ThreeDVector
+    camber_line :: Spline1D # Y locations for x in [-1, 1]
+
+    function WingChordSection(
+        LE_location :: ThreeDVector,
+        TE_location :: ThreeDVector,
+        camber_line :: Spline1D
+        )
+        new(LE_location, TE_location, camber_line)
+    end
+end
+
+function WingChordSection(
+    LE_location :: ThreeDVector,
+    TE_location :: ThreeDVector
+    )
+    xs = [-1., 1.]
+    ys = [0., 0.]
+    camber_line = Spline1D(xs, ys, k=1)
+    return WingChordSection(LE_location, TE_location, camber_line)
+end
+
+function WingChordSection()
+    return WingChordSection(
+        ThreeDVector(-1., 0., 0.),
+        ThreeDVector(1., 0., 0.)
+    )
+end
+
+function angle_of_attack(chord :: WingChordSection)
+    dx = chord.TE_location - chord.LE_location
+    unit!(dx)
+    math.asin(dx.z)
+end
+
+"""Compute the location for the camberline at a point x in [-1, 1] for [le, te]
+"""
+function location(
+    chord_section :: WingChordSection,
+    normal_dir :: ThreeDVector,
+    x :: Float64)
+
+    dx = chord_section.TE_location - chord_section.LE_location
+    len = abs(dx)
+    cam = len * chord_section.camber_line(x) / 2
+    loc = chord_section.LE_location + dx * (x + 1) / 2
+    loc += unit(normal_dir) * cam
+    return loc
+end
+
+function chord(
+    chord_section :: WingChordSection
+    )
+
+    return chord_section.TE_location - chord_section.LE_location
+end
+
+function lump_vorticities(
+    chord_section :: WingChordSection,
+    vorticity_fn :: Function,
+    locations :: Vector{Float64},
+    extenal_effects :: Vector{Float64}
+    )
+    @assert(all(map(x->abs(x) <= 1.0, locations)))
+    @assert(allunique(locations))
+    @assert(size(locations) == size(extenal_effects))
+    # We want things in order, but need to return our results in whatever order
+    # the user needs:
+    reordering = sortperm(locations)
+    sorted = locations[reordering]
+    separators = vcat(-1.0, (sorted[1 : end - 1] + sorted[2 : end]) / 2., 1.0)
+    values = zeros(size(locations)[1])
+    # We need to correct our integral for chord length and for the camber
+    len = abs(chord(chord_section))
+    function fn(x :: Float64)
+        mult = len * sqrt(1 + (derivative(chord_section.camber_line, x))^2)
+        return mult * vorticity_fn(x)
+    end
+    # Use the Simpson's rule over each separated bit to integrate a vorticity.
+    for i = 1 : size(locations)[1]
+        x = [separators[i], 0.0, separators[i + 1]]
+        x[2] = (x[1] + x[3])/ 2.
+        w = (x[3] - x[1]) * [1.0, 4.0, 1.0] / 3.0
+        values[reordering[i]] = extenal_effects[i] *
+            mapreduce(x->x[1] * fn(x[2]), +, 0.0, zip(w, x))
+    end
+    return values
+end
+
+function lump_vorticities(
+    chord_section :: WingChordSection,
+    vorticity_fn :: Function,
+    locations :: Vector{Float64}
+    )
+    ext = ones(size(locations)[1])
+    return lump_vorticities(chord_section, vorticity_fn, locations, ext)
+end
+#= END WingChordSection ------------------------------------------------------=#
+
+#===============================================================================
+    StripDefinedWing
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type StripDefinedWing
+    # Define the locations of the strips used in the analysis:
+    strips :: Vector{WingChordSection}
+
+    # Define the locations of the wing tips:
+    tip_yplus_LE_location :: ThreeDVector
+    tip_yplus_TE_location :: ThreeDVector
+    tip_yminus_LE_location :: ThreeDVector
+    tip_yminus_TE_location :: ThreeDVector
+end
+
+""" Obtain 3 splines representing the x, y and z positions respectively
+of the wing trailing edge with respect to their index. For n segements, 0
+represents the yminus tip and n + 1 the yplus tip. """
+function te_spline(wing :: StripDefinedWing)
+    n = size(wing.strips)[1]
+    x = zeros(n + 2)
+    y = zeros(n + 2)
+    z = zeros(n + 2)
+    x[1] = wing.tip_yminus_TE_location.x
+    y[1] = wing.tip_yminus_TE_location.y
+    z[1] = wing.tip_yminus_TE_location.z
+    for i = 1:n
+        if isfinite(wing.strips[i].TE_location) != true
+            error("Nonfinite wing strip TE definition.")
+        end
+        x[i+1] = wing.strips[i].TE_location.x
+        y[i+1] = wing.strips[i].TE_location.y
+        z[i+1] = wing.strips[i].TE_location.z
+    end
+    x[n+2] = wing.tip_yplus_TE_location.x
+    y[n+2] = wing.tip_yplus_TE_location.y
+    z[n+2] = wing.tip_yplus_TE_location.z
+    iota_array = Vector{Float64}(0:n+1)
+    spl_x = Spline1D(iota_array, x)
+    spl_y = Spline1D(iota_array, y)
+    spl_z = Spline1D(iota_array, z)
+    return spl_x, spl_y, spl_z
+end
+
+""" Obtain 3 splines representing the x, y and z positions respectively
+of the wing leading edge with respect to their index. For n segements, 0
+represents the yminus tip and n + 1 the yplus tip. """
+function le_spline(wing :: StripDefinedWing)
+    n = size(wing.strips)[1]
+    x = zeros(n + 2)
+    y = zeros(n + 2)
+    z = zeros(n + 2)
+    x[1] = wing.tip_yminus_LE_location.x
+    y[1] = wing.tip_yminus_LE_location.y
+    z[1] = wing.tip_yminus_LE_location.z
+    for i = 1:n
+        if isfinite(wing.strips[i].LE_location) != true
+                error("Nonfinite wing strip LE definition.")
+            end
+        x[i+1] = wing.strips[i].LE_location.x
+        y[i+1] = wing.strips[i].LE_location.y
+        z[i+1] = wing.strips[i].LE_location.z
+    end
+    x[n+2] = wing.tip_yplus_LE_location.x
+    y[n+2] = wing.tip_yplus_LE_location.y
+    z[n+2] = wing.tip_yplus_LE_location.z
+    iota_array = Vector{Float64}(0:n+1)
+    spl_x = Spline1D(iota_array, x)
+    spl_y = Spline1D(iota_array, y)
+    spl_z = Spline1D(iota_array, z)
+    return spl_x, spl_y, spl_z
+end
+
+""" Obtain the direction of the normal vector excluding any camber.
+Returns 3 splines representing the x, y and z direction in a unit vector
+representing the normal a the midchord for arg is 0 to n+1 for n strips
+on the wing. """
+function nocamber_normal_splines(wing :: StripDefinedWing)
+    lex, ley, lez = le_spline(wing)
+    tex, tey, tez = te_spline(wing)
+    n = size(wing.strips)[1]
+    x = zeros(n + 2)
+    y = zeros(n + 2)
+    z = zeros(n + 2)
+    for i = 0 : n + 1
+        le = ThreeDVector(lex(i), ley(i), lez(i))
+        te = ThreeDVector(tex(i), tey(i), tez(i))
+        dle = ThreeDVector(map(x->derivative(x, Float64(i)), [lex, ley, lez]))
+        dte = ThreeDVector(map(x->derivative(x, Float64(i)), [tex, tey, tez]))
+        cdir = te - le # chord direction
+        if abs(cdir) == 0.0
+            normal = ThreeDVector(0.0, 0.0, 0.0)
+        else
+            ddir = (dle + dte) / 2. # midchord spanwise direction
+            normal = unit(cross(cdir, ddir))
+        end
+        x[i + 1] = normal.x
+        y[i + 1] = normal.y
+        z[i + 1] = normal.z
+    end
+    iota_array = Vector{Float64}(0 : n+1)
+    spl_x = Spline1D(iota_array, x)
+    spl_y = Spline1D(iota_array, y)
+    spl_z = Spline1D(iota_array, z)
+    return spl_x, spl_y, spl_z
+end
+
+"""
+Returns a function that generates points on the wing surface.
+
+For a StripDefinedWing it is useful to be able to obtain a continious surface.
+This function returns a function f(s, x) that returns a point p (ThreeDVector)
+on the wing surface. s is the strip position (0 -> y_minus tip, n + 1 to y_plus
+tip) and x defines the chordwise position.
+"""
+function get_surface_fn(
+    wing :: StripDefinedWing
+    )
+    lex, ley, lez = le_spline(wing)
+    tex, tey, tez = te_spline(wing)
+    nex, ney, nez = nocamber_normal_splines(wing)
+
+    function s(
+        strip_pos :: T1,
+        x :: T2
+        ) where {T1 <: Real, T2 <: Real}
+        @assert(abs(x) <= 1.)
+        @assert(strip_pos >= 0)
+        @assert(strip_pos <= size(wing.strips)[1] + 1)
+        const s = strip_pos
+        le = ThreeDVector(lex(s), ley(s), lez(s))
+        te = ThreeDVector(tex(s), tey(s), tez(s))
+        n = ThreeDVector(nex(s), ney(s), nez(s))
+        p = le + 0.5 * (x + 1.) * (te - le)
+        i_cf = Int64(floor(strip_pos))
+        i_cc = Int64(ceil(strip_pos))
+        if 0 < i_cf <= length(wing.strips)
+            c_cf = wing.strips[i_cf].camber_line(x)
+        else
+            c_cf = 0.0
+        end
+        if 0 < i_cc <= length(wing.strips)
+            c_cc = wing.strips[i_cc].camber_line(x)
+        else
+            c_cc = 0.0
+        end
+        p += n * (c_cc * (x % 1.0) + c_cf * (1. - x % 1.0)) * abs(te - le)
+        if isfinite(p) != true
+            error("Evaluated surface location as non-finite")
+        end
+        return p
+    end
+    return s
+end
+
+"""
+Returns a function that returns the direction of the wing chord
+"""
+function get_chord_dir_fn(
+    wing :: StripDefinedWing
+    )
+    lex, ley, lez = le_spline(wing)
+    tex, tey, tez = te_spline(wing)
+    function s(
+        strip_pos :: T1,
+        x :: T2
+        ) where {T1 <: Real, T2 <: Real}
+        @assert(abs(x) <= 1.)
+        @assert(strip_pos >= 0)
+        @assert(strip_pos <= size(wing.strips)[1] + 1)
+        const s = strip_pos
+        le = ThreeDVector(lex(s), ley(s), lez(s))
+        te = ThreeDVector(tex(s), tey(s), tez(s))
+        cdir = unit(te - le)
+        if isfinite(cdir) != true
+            error("Tried to evaluate chord direction at zero-chord location.")
+        end
+        return p
+    end
+    return s
+end
+
+"""
+Returns a function that returns the deta_dx dot unit(chord)
+"""
+function get_surface_detadx_dot_c_fn(
+    wing :: StripDefinedWing
+    )
+    lex, ley, lez = le_spline(wing)
+    tex, tey, tez = te_spline(wing)
+    nex, ney, nez = nocamber_normal_splines(wing)
+
+    function s(
+        strip_pos :: T1,
+        x :: T2
+        ) where {T1 <: Real, T2 <: Real}
+        @assert(abs(x) <= 1.)
+        @assert(strip_pos >= 0)
+        @assert(strip_pos <= size(wing.strips)[1] + 1)
+        const s = strip_pos
+        le = ThreeDVector(lex(s), ley(s), lez(s))
+        te = ThreeDVector(tex(s), tey(s), tez(s))
+        n = ThreeDVector(nex(s), ney(s), nez(s))
+        cdir = unit(te - le)
+        i_cf = Int64(floor(strip_pos))
+        i_cc = Int64(ceil(strip_pos))
+        if 0 < i_cf <= length(wing.strips)
+            c_cf = derivative(wing.strips[i_cf].camber_line(x))
+        else
+            c_cf = 0.0
+        end
+        if 0 < i_cc <= length(wing.strips)
+            c_cc = derivative(wing.strips[i_cc].camber_line(x))
+        else
+            c_cc = 0.0
+        end
+        cderiv = c_cc * (x % 1.0) + c_cf * (1. - x % 1.0)
+        deta_dx = cderiv * abs(te -le) / 2.0
+        p = deta_dx * cdir
+        if isfinite(p) != true
+            error("Could not evaluate deta/dx * unit(chord)")
+        end
+        return p
+    end
+    return s
+end
+
+#= END StripDefinedWing ------------------------------------------------------=#
+
+#===============================================================================
+    ThreeDSpanwiseFilamentWingRepresentation
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type ThreeDSpanwiseFilamentWingRepresentation
+    filaments_ym :: Vector{Vector{ThreeDStraightVortexFilament}}
+    filaments_yp :: Vector{Vector{ThreeDStraightVortexFilament}}
+    n_filaments_per_chord :: Vector{Int64}
+    n_chords :: Int64
+
+    function ThreeDSpanwiseFilamentWingRepresentation(
+        n_chords :: Int64, n_fils_per_chord :: Int64
+        )
+
+        n_filaments_per_chord = ones(n_chords) * n_fils_per_chord
+        c_fils = Vector{ThreeDStraightVortexFilament}(n_fils_per_chord)
+        for i = 1 : length(c_fils)
+            c_fils[i] = ThreeDStraightVortexFilament()
+        end
+        filaments_ym =
+            [deepcopy(c_fils) for _ in 1:n_chords]
+        filaments_yp = deepcopy(filaments_ym)
+        new(filaments_ym, filaments_yp, n_filaments_per_chord, n_chords)
+    end
+end
+
+function convert(
+    ::Type{Vector{ThreeDStraightVortexFilament}},
+    a::ThreeDSpanwiseFilamentWingRepresentation)
+
+    n_fil = 2 * sum(a.n_filaments_per_chord)
+    vect = Vector{ThreeDStraightVortexFilament}([])
+    for i = 1 : n_chords
+        vect = vcat(vect, a.filaments_ym[i], a.filaments_yp[i])
+    end
+    return vect
+end
+
+function zero_vorticities!(wing :: ThreeDSpanwiseFilamentWingRepresentation)
+    for c in vcat(filaments_ym, filaments_yp)
+        for f in c
+            c.vorticity = 0.0
+        end
+    end
+end
+
+function add_vorticity!(
+    wing :: StripDefinedWing,
+    filament_positions :: Vector{Float64},
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    strip_idx :: Int64,
+    func :: Function)
+    @assert(strip_idx > 0)
+    @assert(strip_idx <= length(wing.strips))
+    @assert(length(fil_wing.filaments_yp[strip_idx]) ==
+        length(fil_wing.filaments_ym[strip_idx]) )
+
+    nf = length(fil_wing.filaments_ym[strip_idx])
+    fils_yp = fil_wing.filaments_yp[strip_idx]
+    fils_ym = fil_wing.filaments_ym[strip_idx]
+
+    ext_ym, ext_yp = slant_correction_factors(
+        wing, fil_wing, filament_positions, strip_idx)
+    vort = lump_vorticities(wing.strips[strip_idx], func,
+        filament_positions, ext_ym)
+    for i = 1 : nf
+        fil_wing.filaments_ym[strip_idx][i].vorticity = vort[i]
+    end
+    vort = lump_vorticities(wing.strips[strip_idx], func,
+        filament_positions, ext_yp)
+    for i = 1 : nf
+        fil_wing.filaments_yp[strip_idx][i].vorticity = vort[i]
+    end
+    return
+end
+#= END ThreeDSpanwiseFilamentWingRepresentation ------------------------------=#
+
+#===============================================================================
+    VortexParticleWakeLAUTATSolution
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type VortexParticleWakeLAUTATSolution
+    wing :: StripDefinedWing
+    wake :: ThreeDVortexParticleSet
+    filament_wing :: ThreeDSpanwiseFilamentWingRepresentation
+
+    free_stream_velocity :: ThreeDVector
+    # external_purturbation: accepts ThreeDVector coord & returns ThreeDVector.
+    external_purturbation :: Function
+
+    time :: Float64
+
+    n_fourier_terms :: Int64
+    fourier_terms :: Vector{Vector{Float64}}
+    old_fourier_terms :: Vector{Vector{Float64}}
+
+    k_sloc :: Vector{Float64}
+    k_sind :: Vector{Int64}
+    old_fil_wing_bound_vorticity_vector :: Vector{Float64}
+
+    function VortexParticleWakeLAUTATSolution()
+        wing = StripDefinedWing()
+        wake = ThreeDVortexParticleSet()
+        filament_wing = ThreeDSpanwiseFilamentWingRepresentation()
+        free_stream_velocity = ThreeDVector(1, 0, 0)
+        new( wing, wake, filament_wing, free_stream_velocity)
+    end
+end
+#= END VortexParticleWakeLAUTATSolution --------------------------------------=#
