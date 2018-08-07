@@ -63,9 +63,20 @@ function fourier_term_linear_index(
     strip_idx :: Int64,
     fourier_n :: Int64
     )
-    @assert(0 <= fourier_n < sim.n_fourier_terms)
-    @assert(1 <= strip_idx <= length(sim.wing.strips))
-    return (strip_idx - 1) * sim.n_fourier_terms + fourier_n + 1
+    return fourier_term_linear_index(sim.n_fourier_terms,
+        length(sim.wing.strips))
+end
+
+function fourier_term_linear_index(
+    max_n :: Int64,
+    n_strips :: Int64,
+    fourier_n :: Int64,
+    strip_idx :: Int64
+    )
+    @assert(0 <= fourier_n <= n_fourier_terms)
+    @assert(1 <= strip_idx <= n_strips)
+    ret = (strip_idx - 1) * (max_n + 1) + fourier_n + 1
+    return ret
 end
 
 """Obtain strip index and fourier term number respectively from a linear index.
@@ -74,10 +85,468 @@ function fourier_term_vecvec_index(
     sim :: VortexParticleWakeLAUTATSolution,
     linear_idx :: Int64
     )
-    @assert(1 <= linear_idx <= sim.n_fourier_terms * length(sim.wing.strips))
-    const nf = sim.n_fourier_terms
+    return fourier_term_vecvec_index(sim.n_fourier_terms,
+        length(sim.wing.strips))
+end
+
+function fourier_term_vecvec_index(
+    n_fourier_terms :: Int64, n_strips :: Int64,
+    linear_idx :: Int64
+    )
+    @assert(1 <= linear_idx <= n_fourier_terms * n_strips)
+    const nf = n_fourier_terms
     f = linear_idx % nf - 1
     s = (linear_idx - f - 1) / nf
     @assert(Float64(s) == Int(s))
     return s, f
+end
+
+"""
+Returns a function describing the vorticity fourier vorticity density function
+with repect to nth term. In terms of theta in [0, pi]. For Coeff = 1.0
+"""
+function vorticity_density_theta_fn(n :: Int64)
+    @assert(n >= 0)
+    if n > 0
+        f = x->sin(n * x)
+    else
+        function f(x :: Float64)
+            return (1 + cos(x)) / sin(x)
+        end
+    end
+    return f
+end
+
+"""
+Returns a function describing the vorticity fourier vorticity density function
+with repect to nth term. In terms of x in [-1, 1]. For Coeff = 1.0
+"""
+function vorticity_density_x_fn(n :: Int64)
+    f = vorticity_density_theta_fn(n)
+    return x->f(x_to_theta(x))
+end
+
+"""
+Zeros the wing vorticity and sets a single strip to a fourier function.
+"""
+function set_wing_to_single_bv_fn!(
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    wing :: StripDefinedWing,
+    filament_locs :: Vector{Float64},
+    n:: Int64,
+    strip_idx :: Int64)
+
+    @assert(n >= 0)
+    @assert(0 < strip_idx <= length(fil_wing.filaments_ym))
+
+    zero_vorticities!(fil_wing)
+    fn = vorticity_density_x_fn(n)
+    add_vorticity!(wing, filament_locs, fil_wing, strip_idx, fn)
+    return
+end
+
+"""
+Set wing vorticity according to coeffs
+"""
+function set_wing_to_fourier_set!(
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    wing :: StripDefinedWing,
+    filament_locs :: Vector{Float64},
+    A_vals :: Vector{Vector{Float64}}
+    )
+    @assert(length(A_vals) == length(fil_wing.filaments_ym))
+    @assert(length(fil_wing.filaments_yp)== length(fil_wing.filaments_ym))
+    zero_vorticities!(fil_wing)
+    for strip = 1 : length(A_vals)
+        for n = 0 : length(A_vals[strip]) - 1
+            fn = x->vorticity_density_theta_fn(n)(x) * A_vals[strip][n+1]
+            add_vorticity!(wing, filament_locs, fil_wing, strip, fn)
+        end
+    end
+    return
+end
+
+"""
+Obtain the wash function at a point due to some induced velocity
+"""
+function downwash_2D(
+    chord_dir_fn :: Function,
+    deta_dx_dot_c_fn :: Function,
+    surf_fn :: Function,
+    ind_vel_fn :: Function,
+    spanwise_pos :: Float64,
+    chordwise_pos :: Float64
+    )
+
+    @assert(abs(chordwise_pos) <= 1)
+    loc = surf_fn(spanwise_pos, chordwise_pos)
+    cdir = chord_dir_fn(spanwise_pos, chordwise_pos)
+    deta = deta_dx_dot_c_fn(spanwise_pos, chordwise_pos)
+    v = ind_vel_fn(loc)
+    return dot(v, cdir + deta)
+end
+
+
+"""
+Computes a set of fourier integrals over a given strip given a ind_vel_fn.
+"""
+function downwash_2D_fourier_integrals(
+    chord_dir_fn :: Function,
+    deta_dx_dot_c_fn :: Function,
+    surf_fn :: Function,
+    ind_vel_fn :: Function,
+    spanwise_pos :: Int64,
+    n_max :: Int64,
+    ref_vel :: Float64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+
+    @assert(n_max >= 0)
+    funcs = get_fourier_integrand_vector(n_max, ref_vel)
+    integrals = Vector{Float64}(n_max + 1)
+
+    if method == "nonadaptive"
+        theta = Vector{Float64}(linspace(0, pi, points+2))
+        theta = theta[2:end-1]
+        wash = map(t->downwash_2D(chord_dir_fn, deta_dx_dot_c_fn, surf_fn,
+                    ind_vel_fn, Float64(spanwise_pos), theta_to_x(t)), theta)
+        for i = 0 : n_max
+            integrand = map(x->funcs[i+1](x[1],x[2]), zip(theta, wash))
+            s = Spline1D(theta, integrand, k=order)
+            integrals[i+1] = integrate(s, 0, pi)
+        end
+    else
+        error(string("Invalid integration method ", method))
+    end
+    return integrals
+end
+
+"""
+Get integrands for computing the fourier terms. These take theta
+and downwash as arguments.
+"""
+function get_fourier_integrand_vector(n_max :: Int64, ref_vel :: Float64)
+    funcs = Vector{Function}(n_max + 1)
+    let
+        mult = -1. / (ref_vel * pi)
+        function kernel(theta :: Float64, wash :: Float64)
+            @assert(0. <= theta <= pi)
+            return mult * wash
+        end
+        funcs[1] = kernel
+    end
+    for i = 1 : n_max
+        mult = 2. / (ref_vel * pi)
+        function kernel(theta :: Float64, wash :: Float64)
+            @assert(0. <= theta <= pi)
+            return mult * wash * cos(i * theta)
+        end
+        funcs[i + 1] = kernel
+    end
+    return funcs
+end
+
+"""
+Computes fourier integrals for all the strips given an ind_vel_fn
+"""
+function downwash_2D_fourier_integrals_all_strips(
+    chord_dir_fn :: Function,
+    deta_dx_dot_c_fn :: Function,
+    surf_fn :: Function,
+    ind_vel_fn :: Function,
+    spanwise_pos_max :: Int64,
+    n_max :: Int64,
+    ref_vel :: Float64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    integrals = Vector{Float64}((n_max + 1) * spanwise_pos_max)
+
+    for i = 1 : spanwise_pos_max
+        idxs =
+            fourier_term_linear_index.(n_max, spanwise_pos_max, 0:n_max, i)
+        integrals[idxs] =
+            downwash_2D_fourier_integrals(
+                chord_dir_fn, deta_dx_dot_c_fn, surf_fn,
+                ind_vel_fn, i, n_max, ref_vel,
+                method, order, points
+                )
+    end
+
+    return integrals
+end
+
+"""
+Compute self_influence_matrix
+"""
+function downwash_2D_fourier_integrals_all_strips(
+    chord_dir_fn :: Function,
+    deta_dx_dot_c_fn :: Function,
+    surf_fn :: Function,
+    ind_vel_fn :: Function,
+    spanwise_pos_max :: Int64,
+    n_max :: Int64,
+    ref_vel :: Float64,
+    setup_fn :: Function,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+
+    nt = (n_max + 1) * spanwise_pos_max
+    integral_matrix = zeros(nt, nt)
+
+    for s = 1 : spanwise_pos_max
+        for n = 0 : n_max
+            lindex = fourier_term_linear_index(
+                n_max, spanwise_pos_max, n, s)
+            integral_matrix[:, lindex] =
+                downwash_2D_fourier_integrals_all_strips(
+                    chord_dir_fn, deta_dx_dot_c_fn, surf_fn,
+                    ind_vel_fn, spanwise_pos_max, n_max,
+                    ref_vel, method, order, points
+                )
+        end
+    end
+
+    return integral_matrix
+end
+
+
+"""
+Memoize a function of strip and chord position returning ThreeDVector
+Useful for expensive functions.
+"""
+function make_memoized_func_of_strip_and_x(f :: Function)
+    d = Dict{(Float64, Float64), ThreeDVector}()
+    function g(strip :: Float64, x :: Float64)
+        @assert(abs(x) <= 1)
+        if !haskey(d, (strip,x))
+            d[(strip, x)] = f(strip, x)
+        end
+        return d[(strip, x)]
+    end
+    return g
+end
+
+"""
+Memoize a function of ThreeDVector returning ThreeDVector
+Useful for expensive functions.
+"""
+function make_memoized_func_of_strip_and_x(f :: Function)
+    d = Dict{ThreeDVector, ThreeDVector}()
+    function g(loc :: ThreeDVector)
+        if !haskey(d, loc)
+            d[loc] = f(loc)
+        end
+        return d[loc]
+    end
+    return g
+end
+
+function downwash_2D_pure_2D_self_fourier_integrals_matrix(
+    chord :: WingChordSection,
+    filament_positions :: Vector{Float64},
+    n_max :: Int64,
+    ref_vel :: Float64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    # Source and measurement locations
+    sx = filament_positions
+    sy = chord.camber_line(filament_positions)
+    mtheta = linspace(0, pi, points+2)[2:end-1]
+    mx = theta_to_x.(mtheta)
+    my = chord.camber_line.(mx)
+    detadx = x->derivative(chord.camber_line, x)
+
+    u = (dx, dy)-> dy / (2 * pi * (dy^2 + dx^2))
+    v = (dx, dy)-> - dx / (2 * pi * (dy^2 + dx^2))
+    inf = (x, y, xm, ym)-> u(xm-x, ym-y) * detadx(xm) - v(xm-x, ym-y)
+    inf_mat = zeros(points, length(sx))
+    for i = 1 : points
+        inf_mat[i, :] = map(x->inf(x[1],x[2],mx[i],my[i]), zip(sx, sy))
+    end
+    funcs = get_fourier_integrand_vector(n_max, ref_vel)
+    if method == "nonadaptive"
+        a_n = zeros(n_max + 1, n_max + 1)
+        for s = 0 : n_max
+            density_func_s = vorticity_density_theta_fn(s)
+            for m = 0 : n_max
+                density_func = vorticity_density_theta_fn(m)
+                vort = lump_vorticities(chord, density_func, filament_positions)
+                kernal = inf_mat * vort .* density_func_s.(mtheta)
+                ws = Spline1D(mtheta, kernal, k=order)
+                a_n[s + 1, m + 1] = integrate(ws, 0, pi)
+            end
+        end
+    else
+        error(string("Invalid integration method ", method))
+    end
+    return a_n
+end
+
+function downwash_2D_pure_2D_self_fourier_integrals_matrix(
+    wing :: StripDefinedWing,
+    filament_positions :: Vector{Float64},
+    n_max :: Int64,
+    ref_vel :: Float64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    dw = zeros((n_max+1)*length(wing.strips), (n_max+1)*length(wing.strips))
+    for s = 1 : length(wing.strips)
+        idxs = fourier_term_linear_index.(
+            n_max, length(wing.strips), 0:n_max, s)
+        dw[idxs, idxs] = downwash_2D_pure_2D_self_fourier_integrals_matrix(
+            wing.strips[s], filament_positions, n_max,
+            ref_vel, method, order, points )
+    end
+    return dw
+end
+
+function wing_velocity_to_fourier_integrals_vector(
+    chord_dir_fn :: Function,
+    deta_dx_dot_c_fn :: Function,
+    untransformed_wing :: StripDefinedWing,
+    kinematics :: ThreeDCoordinateTransform,
+    spanwise_pos_max :: Int64,
+    n_max :: Int64,
+    ref_vel :: Float64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    integrals = zeros((n_max + 1) * spanwise_pos_max)
+    surf = get_surface_fn(untransformed_wing)
+    ind_vel = x->-derivative2(kinematics, x)
+
+    for s = 1 : spanwise_pos_max
+        idxs =
+            fourier_term_linear_index.(n_max, spanwise_pos_max, 0:n_max, s)
+        integrals[idxs] =
+            downwash_2D_fourier_integrals(
+                chord_dir_fn, deta_dx_dot_c_fn, surf,
+                ind_vel, s, n_max, ref_vel,
+                method, order, points
+                )
+    end
+
+    return integrals
+end
+
+function compute_new_particles_and_wing_fourier_integral_matrix(
+    wing :: StripDefinedWing,
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    fil_locs :: Vector{Float64},
+    old_bound_vorticities :: Vector{Float64},
+    ref_vel :: Float64,
+    new_particles :: Vector{ThreeDVortexParticle},
+    kelvin_particle_indexes :: Vector{Int64},
+    dt :: Float64,
+    ind_vel_external :: Function,
+    n_max :: Int64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    ind_vel_np :: Function = x->x # Induced vel excluding new particles.
+    ind_vel_pw :: Function = x->x # Induced vel due to new particles and wing.
+    function reset(sti :: Int64, n :: Int64)
+        set_wing_to_single_bv_fn!(fil_wing, wing, filament_positions, sti, n)
+        ind_vel_n = x->ind_vel_external(x) + ind_vel(fil_wing, x)    # Is this correct?
+        vf = get_particle_vorticity_function(
+            particles, k_sind, dt, ind_vel_n)
+        particle_vorts = vf(wing_to_bv_vector(fil_wing), old_bound_vorticities)
+        for i = 1 : length(a)
+            particles[i].vorticity =
+                unit(particles[i].vorticity) * particle_vorts[i]
+        end
+        ind_vel_pw = x->ind_vel(fil_wing, x) + ind_vel(particles, x)
+    end
+    chord_dir_fn = get_chord_dir_fn(wing)
+    deta_dx_dot_c_fn = get_surface_detadx_dot_c_fn(wing)
+    surf_fn = get_surface_fn(wing)
+    mtrx = downwash_2D_fourier_integrals_all_strips(
+        chord_dir_fn, deta_dx_dot_c_fn, surf_fn,
+        ind_vel_pw, length(wing.strips), n_max,
+        ref_vel, reset, method, order, points )
+    return mtrx
+end
+
+function solve_new_vortex_particle_vorticities_and_assign!(
+    untransformed_wing :: StripDefinedWing,
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    kinem :: ThreeDCoordinateTransform,
+    fil_locs :: Vector{Float64},
+    old_bound_vorticities :: Vector{Float64},
+    ref_vel :: Float64,
+    new_particles :: Vector{ThreeDVortexParticle},
+    kelvin_particle_indexes :: Vector{Int64},
+    dt :: Float64,
+    ind_vel_external :: Function,
+    n_fourier_terms :: Int64,
+    method :: String ="nonadaptive",
+    order :: Int64=2,
+    points :: Int64=50
+    )
+    wing = transform_ThreeDVectors(x->kinem(x), untransformed_wing)
+    cdir_fn = get_chord_dir_fn(wing)
+    deta_fn = get_surface_detadx_dot_c_fn(wing)
+    surf_fn = get_surface_fn(wing)
+
+    # Downwash matrix due to the new wing / vortex particle combo.
+    p_w_mtrx = compute_new_particles_and_wing_fourier_integral_matrix(
+        wing, fil_wing, fil_locs, old_bound_vorticities,
+        ref_vel, new_particles, kelvin_particle_indexes,
+        dt, ind_vel_external, n_fourier_terms, method, order, points
+        )
+
+    # The downwash due to the wing's velocity.
+    w_vel_vec = wing_velocity_to_fourier_integrals_vector(
+        cdir_fn, deta_fn, untransformed_wing, kinem,
+        length(wing.strips), n_fourier_terms,
+        ref_vel, method, order, points )
+
+    # The downwash due to the wing on itself in a 2D sense
+    dw_2d = downwash_2D_pure_2D_self_fourier_integrals_matrix(
+            wing, filament_positions, n_fourier_terms, ref_vel,
+            method, order,  points)
+
+    # The downwash due to the wake and free stream
+    dw_wake = downwash_2D_fourier_integrals_all_strips(
+        cdir_fn, deta_fn, surf_fn, ind_vel_external, length(wing.strips),
+        n_fourier_terms, ref_vel, method, order, points)
+
+    #fourier_terms = (p_w_mtrx - dw_2d) \ (w_vel_vec + dw_wake)
+    display(p_w_mtrx)
+    print("\n")
+    display(dw_2d)
+    print("\n")
+    display(w_vel_vec)
+    print("\n")
+    display(dw_wake)
+    print("\n")
+    fourier_terms = (p_w_mtrx - dw_2d) \ (w_vel_vec + dw_wake)
+    strip_ft = Vector{Vector{Float64}}(length(wing.strips))
+    for s = 1 : length(wing.strips)
+        idxs = fourier_term_linear_index.(
+            n_fourier_terms, length(wing.strips), 0:n_fourier_terms, s)
+        strip_ft[s] = fourier_terms[idxs]
+    end
+    set_wing_to_fourier_set!(fil_wing, wing, filament_positions, strip_ft)
+    bvs = wing_to_bv_vector(fil_wing)
+    ind_vel_fn = x->ind_vel_external(x) + ind_vel(fil_wing, x)
+    bvf = get_particle_vorticity_function(new_particles,
+        kelvin_particle_indexes, dt, ind_vel_fn)
+    particle_vorts = bvf(bvs, old_bvs)
+    for i = 1 : length(particles)
+        particles[i].vorticity = particle_vorts[i] * unit(particles[i].vorticity)
+    end
+    return strip_ft
 end

@@ -109,8 +109,8 @@ function ind_dvortdt(
     reduction_factor_fn :: Function,
     vorticity_fraction_fn :: Function
     )
-    if dvort_induced_on_particle.coord == inducing_particle.coord or
-	abs(particle.vorticity) == 0.0
+    if dvort_induced_on_particle.coord == inducing_particle.coord ||
+	abs(inducing_particle.vorticity) == 0.0
         return ThreeDVector(0., 0., 0.)
     end
 
@@ -434,9 +434,17 @@ function mutual_ind(
         _vorticity_fraction_fn)
 end
 
+function ind_vel(
+	particle_set :: ThreeDVortexParticleSet,
+	mes_pos :: ThreeDVector
+	)
+	return ind_vel(particle_set.particles, mes_pos,
+		particle_set._reduction_factor_fn)
+end
+
+
 """ Sums any externally induced velocity or rate of change of vorticity
 to the existing.
-
 
 external_velocity_influence is a function that is takes a single
 ThreeDVortexParticle argument representing a cartesian coordinate and returns a
@@ -455,7 +463,7 @@ function external_ind!(
     n = size(particle_set.particles)[1]
     for i = 1 : n
         particle_set.particles[i].velocity +=
-            external_velocity_influence(particle_set.particles[i])
+            external_velocity_influence(particle_set.particles[i].coord)
         particle_set.particles[i].vorticity_time_derivative +=
             external_rate_of_change_of_vorticity_influence(particle_set.particles[i])
     end
@@ -489,12 +497,15 @@ function euler_forward_step!(
     dt :: Float64
     )
 
-  mutual_ind(particle_set.particles, particle_set._reduction_factor_fn,
-      particle_set._vorticity_fraction_fn)
-  external_ind!(particle_set, external_velocity_influence,
-      external_rate_of_change_of_vorticity_influence)
-  integration_step!(particle_set.particles, dt)
-  return particles
+    if length(particle_set) == 0
+        return particle_set
+    end
+    mutual_ind(particle_set.particles, particle_set._reduction_factor_fn,
+        particle_set._vorticity_fraction_fn)
+    external_ind!(particle_set, external_velocity_influence,
+        external_rate_of_change_of_vorticity_influence)
+    integration_step!(particle_set.particles, dt)
+    return particle_set
 end
 
 """
@@ -611,7 +622,7 @@ function ind_dvortdt(
     inducing_filament :: Vector{ThreeDStraightVortexFilament}
     )
 
-    return map(x->ind_dvortdt(induced_particle, x), inducing_filament)
+    return map(x->ind_dvortdt(induced_particles, x), inducing_filament)
 end
 #= END ThreeDStraightVortexFilament functions =================================#
 
@@ -646,7 +657,8 @@ function slant_correction_factors(
     strip_idx :: Int64
     )
     @assert(strip_idx > 0)
-    @assert(strip_idx <= length(wing.strips))
+    @assert(strip_idx <= length(fil_wing.filaments_yp))
+	@assert(length(fil_wing.filaments_yp) == length(fil_wing.filaments_ym))
     @assert(all(abs.(filament_locs) .<= 1.0))
 
     c = chord(wing.strips[strip_idx])
@@ -723,8 +735,8 @@ function new_vortex_particle_locations(
     old_vortex_particles_positions :: Vector{ThreeDVector},
     span_shed_loc :: Vector{Float64}
     )
-    @assert(all(span_shed_loc .>= 0.0))
-    @assert(all(span_shed_loc .<= length(wing.strips) + 1))
+    @assert(all(span_shed_loc .>= 0.5))
+    @assert(all(span_shed_loc .<= length(wing.strips) + .5))
     @assert(size(span_shed_loc)
         == size(old_vortex_particles_positions))
     oppos = old_vortex_particles_positions
@@ -741,8 +753,7 @@ function helmholtz_vortex_particle_locations(
     )
 	@assert(length(old_helmholtz_vortex_particles_positions) ==
 		length(wing.strips) * 2 + 1)
-    pos = vcat(0.0, 1 : 0.5 : Float64(length(fil_wing.filaments_ym)),
-        Float64(length(fil_wing.filaments_ym)) + 1)
+    pos = Vector{Float64}(.5 : .5 : Float64(length(fil_wing.filaments_ym)) + .5)
     return new_vortex_particle_locations(wing,
         old_helmholtz_vortex_particles_positions, pos)
 end
@@ -768,16 +779,9 @@ function initial_helmholtz_particles_positions(
         end
         return locn + dx
     end
-    # Tips
-    initial_locs[1] = loc(0.0)
-    initial_locs[end] = loc(Float64(n_strips + 1))
-    # On strips
-    for i = 1 : n_strips
-        initial_locs[i * 2] = loc(Float64(i))
-    end
-    for i = 1 : n_strips - 1
-        initial_locs[i * 2 + 1] = loc(i + 0.5)
-    end
+	for i = 0.5 : 0.5 : n_strips + 0.5
+		initial_locs[Int64(i * 2)] = loc(i)
+	end
     return initial_locs
 end
 
@@ -796,18 +800,10 @@ function kelvin_particles_span_shedding_locations(
     tex, tey, tez = te_spline(wing)
     f = x->ThreeDVector(tex(x), tey(x), tez(x))
     function subsection(strip :: Int64)
-        if 1 < strip
-            # Points on the y minus part of the trailing edge.
-            tm = Vector{Float64}(strip - 0.5 : 0.1: strip)
-        else
-            tm = Vector{Float64}(0.0 : 0.2: 1.0)
-        end
-        if strip < ns
-            # Points on the y plus part of the trailing edge.
-            tp = Vector{Float64}(strip : 0.1: strip + 0.5)
-        else
-            tp = Vector{Float64}(strip : 0.2 : ns + 1)
-        end
+		# Places to evaluate the tailing edge spline:
+        tm = Vector{Float64}(strip - 0.5 : 0.05: strip)
+        tp = Vector{Float64}(strip : 0.05: strip + 0.5)
+		# Eval spline
         ftm = f.(tm)
         ftp = f.(tp)
         # Compute the lengths between the adjacent points and sum.
@@ -937,8 +933,8 @@ function k_particle_shedding_locs_to_bv_index(
 	s_loc :: Vector{Float64},
 	n_strips :: Int64
 	)
-	@assert(all(s_loc .>= 0.0))
-	@assert(all(s_loc .<= n_strips + 1.0))
+	@assert(all(s_loc .>= 0.5))
+	@assert(all(s_loc .<= n_strips + 0.5))
 	# s_loc goes from 0 to num_strips + 1.
 	# bit associated with a strip is ns +- 0.5. -0.5 is y_minus side,
 	# +0.5 is y_plus side. Except at the tips where it is -1 and +1...
@@ -947,12 +943,6 @@ function k_particle_shedding_locs_to_bv_index(
 	for i = 1 : length(a)
 		c = round(a[i])
 		b[i] = c > a[i] ? 2 * c - 1 : 2 * c
-		if c == 0
-			b[i] = 1
-		end
-		if c == n_strips + 1
-			b[i] = n_strips * 2
-		end
 	end
 	return b
 end
@@ -965,12 +955,16 @@ An n strip wing will return a 2*n vector.
 function wing_to_bv_vector(
 	fil_wing :: ThreeDSpanwiseFilamentWingRepresentation
 	)
+	@assert(length(fil_wing.filaments_yp)
+									== length(fil_wing.filaments_ym))
 	ns = length(fil_wing.filaments_ym)
 	bvs = zeros(ns * 2)
 	for i = 1 : ns
 		bvs[2*i-1] = mapreduce(x->x.vorticity, +, 0.0, fil_wing.filaments_ym[i])
 		bvs[2*i] = mapreduce(x->x.vorticity, +, 0.0, fil_wing.filaments_yp[i])
 	end
+	@assert(length(bvs) == ns * 2)
+	@assert(all(isfinite.(bvs)))
 	return bvs
 end
 
@@ -1012,19 +1006,14 @@ function get_particle_vorticity_function(
 	# Get dx for the k particles
 	dx = Vector{ThreeDVector}(nk)
 	x = map(x->x.coord, particles[nh + 1: nk + nh])
-	dx[2 : end - 1] = x[1 : end - 2] .- 2 .* x[2 : end - 1] .+ x[3 : end]
+	dx[2 : end - 1] = (x[3 : end] .- x[1 : end - 2]) / 2.
 	dx[1] = x[2] - x[1]
 	dx[end] = x[end] - x[end - 1]
 	for i = nh + 1 : nh + nk
 		loc = particles[i].coord
 		particles[i].vorticity = unit(dx[i - nh])
 		idx = k_particle_to_bv_index_mapping[i - nh]
-		if idx < nh
-			bv_mat[i, idx] = abs(dx[i - nh])
-		end
-		if idx > 1
-			bv_mat[i, idx - 1] = -abs(dx[i - nh])
-		end
+		bv_mat[i, idx] = abs(dx[i - nh])
 	end
 	function bv_to_vort_mult(
 		bvs :: Vector{Float64}, old_bvs :: Vector{Float64})
@@ -1044,8 +1033,8 @@ function ind_vel(
     strip_idx :: Int64
     )
     @assert(0 < strip_idx <= length(fil_wing.filaments_ym))
-    return ind_vel(fil_wing.filaments_ym[strip_idx], measurement_loc) +
-        ind_vel(fil_wing.filaments_yp[strip_idx], measurement_loc)
+    return sum(ind_vel(fil_wing.filaments_ym[strip_idx], measurement_loc) +
+        ind_vel(fil_wing.filaments_yp[strip_idx], measurement_loc))
 end
 
 function ind_vel(
@@ -1053,9 +1042,29 @@ function ind_vel(
     measurement_loc :: ThreeDVector
     )
     return mapreduce(
-        x->ind_vel(fil_wing.filaments_ym[strip_idx], measurement_loc) +
-            ind_vel(fil_wing.filaments_yp[strip_idx], measurement_loc),
-        +, 0.0, iota(length(fil_wing.filaments_ym)))
+        x->ind_vel(fil_wing, measurement_loc, x),
+        +, ThreeDVector(0,0,0), 1:length(fil_wing.filaments_ym))
+end
+
+function ind_dvortdt(
+    induced_particle :: ThreeDVortexParticle,
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    strip_idx :: Int64
+    )
+
+    return sum(
+        ind_dvortdt(induced_particle, fil_wing.filaments_ym[strip_idx]) +
+        ind_dvortdt(induced_particle, fil_wing.filaments_yp[strip_idx]))
+end
+
+function ind_dvortdt(
+    induced_particle :: ThreeDVortexParticle,
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation
+    )
+
+    return mapreduce(
+        x->ind_dvortdt(induced_particle, fil_wing, x),
+        +, ThreeDVector(0,0,0), 1:length(fil_wing.filaments_ym))
 end
 #= END ThreeDSpanwiseFilamentWingRepresentation functions =====================#
 
@@ -1119,11 +1128,11 @@ function build_vortex_filament_wing_geometry(
         error(string("Chord positions were not in [-1, 1] where -1 is leading",
             "edge and 1 is trailing edge."))
     end
-    n_strips = size(wing.strips)[1]
+    n_strips = length(wing.strips)
     if n_strips <= 0
         error("Wing must have a positive (nonzero) number of strips.")
     end
-    n_fil = size(chord_positions)[1]
+    n_fil = length(chord_positions)
     @assert(n_fil > 1)
     fil_wing = ThreeDSpanwiseFilamentWingRepresentation(n_strips, n_fil)
     surf_func = get_surface_fn(wing)
@@ -1152,20 +1161,67 @@ function build_vortex_filament_wing_geometry(
     return fil_wing
 end
 
-function apply_kinematics_to_coord(
-    coords :: Vector{ThreeDVector},
-    kinematics :: KinemDef3D
-    )
-    s = sin(kinematics.alpha)
-    c = cos(kinematics.alpha)
-    ncoords = deepcopy(ncoords) # We return n(ew) wing
 
-    function mod!(point :: ThreeDVector)
-        tx = point.x * c + point.y * s
-        ty = - point.x * s + point.y * c
-        point.x = tx
-        point.y = ty + h
-    end
-    ncoords = map(mod, ncoords)
+function transform_ThreeDVectors(
+	func :: Function,
+	coord :: ThreeDVector
+	)
+	return func(coord)
+end
+
+function transform_ThreeDVectors(
+	func :: Function,
+	fil :: ThreeDStraightVortexFilament
+	)
+	f = deepcopy(fil)
+	f.start_coord = transform_ThreeDVectors(func, f.start_coord)
+	f.end_coord = transform_ThreeDVectors(func, f.end_coord)
+	return f
+end
+
+function transform_ThreeDVectors(
+	func :: Function,
+	coords :: Vector
+	)
+	return map(x->transform_ThreeDVectors(func, x), coords)
+end
+
+function transform_ThreeDVectors(
+	func :: Function,
+	fil_wing :: ThreeDSpanwiseFilamentWingRepresentation
+	)
+	w = deepcopy(fil_wing)
+	for i = 1 : length(w.filaments_ym)
+		w.filaments_yp[i] = transform_ThreeDVectors(func, w.filaments_yp[i])
+		w.filaments_ym[i] = transform_ThreeDVectors(func, w.filaments_ym[i])
+	end
+	return w
+end
+
+function transform_ThreeDVectors(
+	func :: Function,
+	chord :: WingChordSection
+	)
+	c = deepcopy(chord)
+	c.LE_location = transform_ThreeDVectors(func, c.LE_location)
+	c.TE_location = transform_ThreeDVectors(func, c.TE_location)
+	return c
+end
+
+function transform_ThreeDVectors(
+	func :: Function,
+	wing :: StripDefinedWing
+	)
+	w = deepcopy(wing)
+	w.strips = map(x->transform_ThreeDVectors(func, x), w.strips)
+	w.tip_yplus_LE_location =
+		transform_ThreeDVectors(func, w.tip_yplus_LE_location)
+	w.tip_yplus_TE_location =
+		transform_ThreeDVectors(func, w.tip_yplus_TE_location)
+	w.tip_yminus_LE_location =
+		transform_ThreeDVectors(func, w.tip_yminus_LE_location)
+	w.tip_yminus_TE_location =
+		transform_ThreeDVectors(func, w.tip_yminus_TE_location)
+	return w
 end
 #= END VortexParticleWakeLUATATSolution functions =============================#
