@@ -551,11 +551,25 @@ type ThreeDVortexParticleSet
     end
 end
 
+function ThreeDVortexParticleSet(particles :: Vector{ThreeDVortexParticle})
+    r, v = threed_winckelmans_kernels()
+    return ThreeDVortexParticleSet(
+        particles, r, v
+    )
+end
+
 function ThreeDVortexParticleSet()
     r, v = threed_winckelmans_kernels()
     return ThreeDVortexParticleSet(
         Vector{ThreeDVortexParticle}(0), r, v
     )
+end
+
+function convert(
+    ::Type{ThreeDVortexParticleSet},
+    a::Vector{ThreeDVortexParticle})
+    b = ThreeDVortexParticleSet(a)
+    return b
 end
 
 function Base.length(a :: ThreeDVortexParticleSet)
@@ -576,6 +590,10 @@ end
 
 function Base.done(a::ThreeDVortexParticleSet, state :: Int64)
     return state > length(a)
+end
+
+function Base.endof(a::ThreeDVortexParticleSet)
+    return length(a.particles)
 end
 
 function Base.getindex(a::ThreeDVortexParticleSet, i :: Int)
@@ -686,14 +704,20 @@ end
 
 function lump_vorticities(
     chord_section :: WingChordSection,
-    vorticity_fn :: Function,
+    vorticity_fn :: Function,           # For x in [-1, 1]
     locations :: Vector{Float64},
     extenal_effects :: Vector{Float64}
     )
-    @assert(all(map(x->abs(x) <= 1.0, locations)))
+    @assert(all(-1. .< locations .< 1))
     @assert(allunique(locations))
     @assert(size(locations) == size(extenal_effects))
-    @assert(vorticity_fn(1.57) != Inf)
+    @assert(isfinite(vorticity_fn(maximum(locations))))
+    @assert(isfinite(vorticity_fn(minimum(locations))))
+    try # Hopefully this'll catch cases where its defined in 0, pi
+        @assert(isfinite(vorticity_fn(0.0)))
+        @assert(isfinite(vorticity_fn(Float64(pi))))
+    end
+    @assert(all(isfinite.(extenal_effects)))
     # We want things in order, but need to return our results in whatever order
     # the user needs:
     reordering = sortperm(locations)
@@ -706,14 +730,13 @@ function lump_vorticities(
         mult = len * sqrt(1 + (derivative(chord_section.camber_line, x))^2)
         return mult * vorticity_fn(x)
     end
-    # Use the Simpson's rule over each separated bit to integrate a vorticity.
+    # Using a dumb rule that avoids evaluating potentially singular end points.
     for i = 1 : size(locations)[1]
-        x = [separators[i], 0.0, separators[i + 1]]
-        x[2] = (x[1] + x[3])/ 2.
-        w = (x[3] - x[1]) * [1.0, 4.0, 1.0] / 3.0
-        values[reordering[i]] = extenal_effects[i] *
-            mapreduce(x->x[1] * fn(x[2]), +, 0.0, zip(w, x))
+        dx = separators[i + 1] - separators[i]
+        values[reordering[i]] = extenal_effects[i] * dx *
+            vorticity_fn(locations[i])
     end
+    @assert(all(isfinite.(values)))
     return values
 end
 
@@ -722,6 +745,7 @@ function lump_vorticities(
     vorticity_fn :: Function,
     locations :: Vector{Float64}
     )
+    @assert(all(-1 .< locations .< 1))
     ext = ones(size(locations)[1])
     return lump_vorticities(chord_section, vorticity_fn, locations, ext)
 end
@@ -1013,7 +1037,7 @@ function convert(
 
     n_fil = 2 * sum(a.n_filaments_per_chord)
     vect = Vector{ThreeDStraightVortexFilament}([])
-    for i = 1 : n_chords
+    for i = 1 : length(a.filaments_ym)
         vect = vcat(vect, a.filaments_ym[i], a.filaments_yp[i])
     end
     return vect
@@ -1029,14 +1053,15 @@ end
 
 function add_vorticity!(
     wing :: StripDefinedWing,
-    filament_positions :: Vector{Float64},
+    filament_positions :: Vector{Float64},  # in  [-1,1]
     fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
     strip_idx :: Int64,
-    func :: Function)
+    func :: Function)   # For x in [-1, 1]
     @assert(strip_idx > 0)
     @assert(strip_idx <= length(fil_wing.filaments_yp))
     @assert(length(fil_wing.filaments_yp[strip_idx]) ==
         length(fil_wing.filaments_ym[strip_idx]) )
+    @assert(all(-1 .< filament_positions .< 1))
 
     nf = length(fil_wing.filaments_ym[strip_idx])
     fils_yp = fil_wing.filaments_yp[strip_idx]

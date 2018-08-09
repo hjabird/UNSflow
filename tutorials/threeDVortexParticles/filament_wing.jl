@@ -24,30 +24,34 @@ include("../../src/lowOrder3D/calcs.jl")
 include("../../src/lowOrder3D/3DLautat.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
 
-y = [-2., 0., 2.]
-c = [0.7, 1., 0.7]
-n_chords = 3
-chords = Vector{WingChordSection}(n_chords)
-for i = 1 : n_chords
-    chords[i] = WingChordSection()
-    chords[i].camber_line = Spline1D([-1., 0.0, 1.], [0.0, 0.0, 0.0], k=2)
-    chords[i].LE_location.y = y[i]
-    chords[i].TE_location.y = y[i]
-    chords[i].LE_location.x = 0.5 - c[i] / 2.0
-    chords[i].TE_location.x = 0.5 + c[i] / 2.0
-    chords[i].LE_location.z = y[i]^2 * 0.1
-    chords[i].TE_location.z = y[i]^2 * 0.1
+y_span = 2.5
+y_values = y_span * sin.(linspace(-pi/2, pi/2, 5))
+print(string("y_values: ", y_values, "\n"))
+c_fn = x ->1
+c_values = c_fn.(y_values / y_span)
+z_fn = z -> 0
+z_values = z_fn.(y_values / y_span)
+chords = Vector{WingChordSection}(length(y_values) - 2)
+for i = 2 : length(y_values) - 1
+    chords[i-1] = WingChordSection()
+    chords[i-1].camber_line = Spline1D([-1., 0.0, 1.], [0.0, 0.0, 0.0], k=2)
+    chords[i-1].LE_location.y = y_values[i]
+    chords[i-1].TE_location.y = y_values[i]
+    chords[i-1].LE_location.x = 0.5 - c_values[i] / 2.0
+    chords[i-1].TE_location.x = 0.5 + c_values[i] / 2.0
+    chords[i-1].LE_location.z = z_values[i]
+    chords[i-1].TE_location.z = z_values[i]
 end # Good.
 
 t0wing = StripDefinedWing(
     chords,
-    ThreeDVector(0.25, 2.5, 0.8),
-    ThreeDVector(0.75, 2.5, 0.8),
-    ThreeDVector(0.25, -2.5, 0.8),
-    ThreeDVector(0.75, -2.5, 0.8),
+    ThreeDVector(0.5 - c_values[end] / 2.0, y_values[end], z_values[end]),
+    ThreeDVector(0.5 + c_values[end] / 2.0, y_values[end], z_values[end]),
+    ThreeDVector(0.5 - c_values[1] / 2.0, y_values[1], z_values[1]),
+    ThreeDVector(0.5 + c_values[1] / 2.0, y_values[1], z_values[1]),
 )
 
-filament_positions = Vector{Float64}([-cos(x) for x in 0 : 0.1 : pi])
+filament_positions = Vector{Float64}(-1 : 0.05 : 1)[2:end-1]
 original_fil_wing = build_vortex_filament_wing_geometry(
     t0wing, filament_positions
     )
@@ -56,10 +60,10 @@ fil_wing = deepcopy(original_fil_wing)
 kinem = ThreeDCoordinateTransform((x,t)->x + sin(t) * ThreeDVector(0,0,0))
 k_sloc = kelvin_particles_span_shedding_locations(t0wing, 0.1)
 k_sind = k_particle_shedding_locs_to_bv_index(k_sloc, length(t0wing.strips))
-free_stream = x->ThreeDVector(1.0, 0, 0.0)
+free_stream = x->ThreeDVector(1.0, 0.0, 1.0)
 wake = ThreeDVortexParticleSet()
 n_fourier_terms = 1
-dt = 0.1
+dt = 0.05
 old_bvs = zeros(length(t0wing.strips) * 2)
 
 fil_wing = transform_ThreeDVectors(x->kinem(x), original_fil_wing)
@@ -73,8 +77,9 @@ f_terms = solve_new_vortex_particle_vorticities_and_assign!(
 set_wing_to_fourier_set!(fil_wing, t0wing, filament_positions, f_terms)
 old_bvs = wing_to_bv_vector(fil_wing)
 wake += particles
+print(string("Fourier terms: ", f_terms, "\n"))
 
-for n = 1 : 2
+for n = 1 : 0
     # Convection
     e_ind_vel = x->free_stream(x) + ind_vel(fil_wing, x)
     e_ind_dvort = x->ThreeDVector(0,0,0) #ind_dvortdt(x, fil_wing)
@@ -96,6 +101,7 @@ for n = 1 : 2
         )
     wake += particles
     print(string("Iteration ", n, ". ", length(wake), " vortex particles.\n"))
+    print(string("Fourier terms: ", f_terms, "\n"))
 end
 
 # VKT EXPORT ===================================================================

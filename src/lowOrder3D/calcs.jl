@@ -573,7 +573,9 @@ function ind_vel(
     term2n = cross(r1, r2)
     term2d = abs(cross(r1, r2)) ^ 2
     term3 = dot(r0, unit(r1) - unit(r2))
-    return term1 * (term2n / term2d) * term3
+    vel =  term1 * (term2n / term2d) * term3
+    vel = (!isfinite(vel) ? ThreeDVector(0,0,0) : vel)
+    return vel
 end
 
 function ind_vel(
@@ -889,7 +891,7 @@ function shed_initial_particles(
 			ThreeDVector(0,0,0)
 		)
 	end
-	return particles
+	return ThreeDVortexParticleSet(particles)
 end
 
 """
@@ -900,7 +902,7 @@ function shed_particles(
 	wing :: StripDefinedWing,
 	k_particle_shedding_locations :: Vector{Float64},
 	particle_size :: Float64,
-	old_particles :: Vector{ThreeDVortexParticle}
+	old_particles :: ThreeDVortexParticleSet
 	)
 	nh = length(wing.strips) * 2 + 1
 	nk = length(old_particles) - nh
@@ -922,7 +924,7 @@ function shed_particles(
 			ThreeDVector(0,0,0)
 			)
 	end
-	return particles
+	return ThreeDVortexParticleSet(particles)
 end
 
 """
@@ -973,7 +975,7 @@ Returns a function to obtain the intensity of particle vorticities
 from a bound vorticity vector
 """
 function get_particle_vorticity_function(
-	particles :: Vector{ThreeDVortexParticle}, # ordered nh, nk
+	particles :: ThreeDVortexParticleSet, # ordered nh, nk
 	k_particle_to_bv_index_mapping :: Vector{Int64},
 	dt :: Float64,
 	ind_vel :: Function
