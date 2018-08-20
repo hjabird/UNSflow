@@ -529,6 +529,56 @@ ThreeDStraightVortexFilament() =
 #= END ThreeDStraightVortexFilament ------------------------------------------=#
 
 #===============================================================================
+    ThreeDVortexRing
+
+    Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+type ThreeDVortexRing
+    c1 :: ThreeDVector
+    c2 :: ThreeDVector
+    c3 :: ThreeDVector
+    c4 :: ThreeDVector
+    strength :: Float64
+
+    function ThreeDVortexRing(
+        corner1 :: ThreeDVector,
+        corner2 :: ThreeDVector,
+        corner3 :: ThreeDVector,
+        corner4 :: ThreeDVector,
+        strength :: Float64
+        )
+        return new(corner1, corner2, corner3, corne4, strength)
+    end
+end
+
+function ThreeDVortexRing(
+    corner1 :: ThreeDVector,
+    corner2 :: ThreeDVector,
+    corner3 :: ThreeDVector,
+    corner4 :: ThreeDVector
+    )
+    return ThreeDVortexRing(corner1, corner2, corner3, corner4, 0.0)
+end
+
+function ThreeDVortexRing()
+    c1 = ThreeDVector()
+    c2 = ThreeDVector()
+    c3 = ThreeDVector()
+    c4 = ThreeDVector()
+    return ThreeDVortexRing(c1, c2, c3, c4, 0.0)
+end
+
+function convert(::Vector{ThreeDStraightVortexFilament}, a::ThreeDVortexRing)
+    b = Vector{ThreeDStraightVortexFilament}(4)
+    b[1] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
+    b[2] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
+    b[3] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
+    b[4] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
+    return b
+end
+#= END ThreeDVortexRing ------------------------------------------------------=#
+
+#===============================================================================
     ThreeDVortexParticleSet
 
     Initial code: HJAB 2018
@@ -733,8 +783,18 @@ function lump_vorticities(
     # Using a dumb rule that avoids evaluating potentially singular end points.
     for i = 1 : size(locations)[1]
         dx = separators[i + 1] - separators[i]
-        values[reordering[i]] = extenal_effects[i] * dx *
-            vorticity_fn(locations[i])
+        xs = [-sqrt(3/5), 0.0, sqrt(3/5)]
+        ws = [5/9, 8/9, 5/9]
+        if exception_or_nonfinite_to_false(vorticity_fn, separators[i])
+            xs, ws = telles_quadratic_remap(xs, ws, -1.)
+        end
+        if exception_or_nonfinite_to_false(vorticity_fn, separators[i + 1])
+            xs, ws = telles_quadratic_remap(xs, ws, 1.)
+        end
+        xs, ws = linear_remap(xs, ws, [-1, 1], [separators[i], separators[i+1]])
+        ys = map(x->vorticity_fn(x), xs)
+        values[reordering[i]] = extenal_effects[i] *
+            mapreduce(x->x[1] * x[2], +, 0.0, zip(ys, ws))
     end
     @assert(all(isfinite.(values)))
     return values
@@ -1012,8 +1072,7 @@ end
 type ThreeDSpanwiseFilamentWingRepresentation
     filaments_ym :: Vector{Vector{ThreeDStraightVortexFilament}}
     filaments_yp :: Vector{Vector{ThreeDStraightVortexFilament}}
-    n_filaments_per_chord :: Vector{Int64}
-    n_chords :: Int64
+    filaments_cw :: Vector{Vector{ThreeDStraightVortexFilament}}
 
     function ThreeDSpanwiseFilamentWingRepresentation(
         n_chords :: Int64, n_fils_per_chord :: Int64
@@ -1024,10 +1083,11 @@ type ThreeDSpanwiseFilamentWingRepresentation
         for i = 1 : length(c_fils)
             c_fils[i] = ThreeDStraightVortexFilament()
         end
-        filaments_ym =
-            [deepcopy(c_fils) for _ in 1:n_chords]
+        filaments_ym = [deepcopy(c_fils) for _ in 1:n_chords]
         filaments_yp = deepcopy(filaments_ym)
-        new(filaments_ym, filaments_yp, n_filaments_per_chord, n_chords)
+        cw_fils = c_fils[1:end - 1]
+        filaments_cw = [deepcopy(cw_fils) for _ in 1:n_chords * 2 + 1]
+        new(filaments_ym, filaments_yp, filaments_cw)
     end
 end
 
@@ -1035,16 +1095,18 @@ function convert(
     ::Type{Vector{ThreeDStraightVortexFilament}},
     a::ThreeDSpanwiseFilamentWingRepresentation)
 
-    n_fil = 2 * sum(a.n_filaments_per_chord)
     vect = Vector{ThreeDStraightVortexFilament}([])
     for i = 1 : length(a.filaments_ym)
         vect = vcat(vect, a.filaments_ym[i], a.filaments_yp[i])
+    end
+    for v in a.filaments_cw
+        vect = vcat(vect, v)
     end
     return vect
 end
 
 function zero_vorticities!(wing :: ThreeDSpanwiseFilamentWingRepresentation)
-    for c in vcat(wing.filaments_ym, wing.filaments_yp)
+    for c in vcat(wing.filaments_ym, wing.filaments_yp, wing.filaments_cw)
         for f in c
             f.vorticity = 0.0
         end
@@ -1062,6 +1124,7 @@ function add_vorticity!(
     @assert(length(fil_wing.filaments_yp[strip_idx]) ==
         length(fil_wing.filaments_ym[strip_idx]) )
     @assert(all(-1 .< filament_positions .< 1))
+    @assert(isfinite(func(0.0)))
 
     nf = length(fil_wing.filaments_ym[strip_idx])
     fils_yp = fil_wing.filaments_yp[strip_idx]
@@ -1072,12 +1135,21 @@ function add_vorticity!(
     vort = lump_vorticities(wing.strips[strip_idx], func,
         filament_positions, ext_ym)
     for i = 1 : nf
-        fil_wing.filaments_ym[strip_idx][i].vorticity = vort[i]
+        fil_wing.filaments_ym[strip_idx][i].vorticity += vort[i]
     end
+    for i = 1 : nf - 1
+        fil_wing.filaments_cw[strip_idx * 2 - 1][i].vorticity += sum(vort[1:i])
+        fil_wing.filaments_cw[strip_idx * 2][i].vorticity -= sum(vort[1:i])
+    end
+
     vort = lump_vorticities(wing.strips[strip_idx], func,
         filament_positions, ext_yp)
     for i = 1 : nf
-        fil_wing.filaments_yp[strip_idx][i].vorticity = vort[i]
+        fil_wing.filaments_yp[strip_idx][i].vorticity += vort[i]
+    end
+    for i = 1 : nf - 1
+        fil_wing.filaments_cw[strip_idx * 2 + 1][i].vorticity -= sum(vort[1:i])
+        fil_wing.filaments_cw[strip_idx * 2][i].vorticity += sum(vort[1:i])
     end
     return
 end

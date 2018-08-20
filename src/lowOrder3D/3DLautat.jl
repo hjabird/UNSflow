@@ -17,17 +17,20 @@ function VortexParticleWakeLAUTATSolution(
     return starting_solution
 end
 
+
 """Covert x in [-1, 1] to theta in [0, pi]"""
 function x_to_theta(x :: Float64)
     @assert(abs(x) <= 1.0)
     return acos(-x)
 end
 
+
 """Convert theta in [0, pi] to x in [-1, 1]"""
 function theta_to_x(theta :: Float64)
     @assert(0 <= theta <= pi)
     return -cos(theta)
 end
+
 
 """ Obtain geometric information about a point on the wing.
 
@@ -67,6 +70,7 @@ function fourier_term_linear_index(
         length(sim.wing.strips))
 end
 
+
 function fourier_term_linear_index(
     max_n :: Int64,
     n_strips :: Int64,
@@ -79,6 +83,7 @@ function fourier_term_linear_index(
     return ret
 end
 
+
 """Obtain strip index and fourier term number respectively from a linear index.
 """
 function fourier_term_vecvec_index(
@@ -88,6 +93,7 @@ function fourier_term_vecvec_index(
     return fourier_term_vecvec_index(sim.n_fourier_terms,
         length(sim.wing.strips))
 end
+
 
 function fourier_term_vecvec_index(
     n_fourier_terms :: Int64, n_strips :: Int64,
@@ -101,6 +107,7 @@ function fourier_term_vecvec_index(
     return s, f
 end
 
+
 """
 Returns a function describing the vorticity fourier vorticity density function
 with repect to nth term. In terms of theta in [0, pi]. For Coeff = 1.0
@@ -108,22 +115,25 @@ with repect to nth term. In terms of theta in [0, pi]. For Coeff = 1.0
 function vorticity_density_theta_fn(n :: Int64)
     @assert(n >= 0)
     if n > 0
-        function f(x ::Float64)
+        f = function(x ::Float64)
             @assert(0 <= x <= Float64(pi))
             r = sin(n * x)
             @assert(isfinite(r))
             return r
         end
     else
-        function f(x :: Float64)
-            @assert(0 <= x <= Float64(pi))
+        f = function(x :: Float64)
+            @assert(0 < x <= Float64(pi))
             r = (1 + cos(x)) / sin(x)
             @assert(isfinite(r))
             return r
         end
     end
-    return x::Float64->f(x)
+    s = x::Float64->f(x)
+    @assert(isfinite(s(1.57)))
+    return s
 end
+
 
 """
 Returns a function describing the vorticity fourier vorticity density function
@@ -131,8 +141,60 @@ with repect to nth term. In terms of x in [-1, 1]. For Coeff = 1.0
 """
 function vorticity_density_x_fn(n :: Int64)
     f = vorticity_density_theta_fn(n)
-    return x->f(x_to_theta(x))
+    return x::Float64->f(x_to_theta(x))
 end
+
+
+function vorticity_density_theta_derivative_fn(n :: Int64)
+    @assert(n >= 0)
+    if n > 0
+        f = function(x ::Float64)
+            @assert(0 <= x <= Float64(pi))
+            r = n * cos(n * x)
+            @assert(isfinite(r))
+            return r
+        end
+    else
+        f = function(x :: Float64)
+            @assert(0 < x <= Float64(pi))
+            r = -cos(x) / (sin(x)^2)
+            @assert(isfinite(r))
+            return r
+        end
+    end
+    s = x::Float64->f(x)
+    @assert(isfinite(s(1.57)))
+    return s
+end
+
+
+function vorticity_density_x_derivative_fn(n :: Int64)
+    f = vorticity_density_theta_fn(n)
+    return x::Float64->f(x_to_theta(x)) / sqrt(1 - x^2)
+end
+
+
+function vorticity_density_x(fourier_coeffs :: Vector{Float64}, x :: Float64)
+    @assert(-1 < x <= 1)
+    @assert(all(isfinite.(fourier_coeffs)))
+    a = mapreduce(i->vorticity_density_x_fn(i) * fourier_coeffs[i+1],
+        +, 0.0, 0 : length(fourier_coeffs) - 1)
+    @assert(isfinite(a))
+    return a
+end
+
+
+function vorticity_density_x_derivative(
+    fourier_coeffs :: Vector{Float64},
+    x :: Float64)
+    @assert(-1 < x <= 1)
+    @assert(all(isfinite.(fourier_coeffs)))
+    a = mapreduce(i->vorticity_density_x_derivative_fn(Int64(i))(x) * fourier_coeffs[i+1],
+        +, 0.0, 0 : length(fourier_coeffs) - 1)
+    @assert(isfinite(a))
+    return a
+end
+
 
 """
 Zeros the wing vorticity and sets a single strip to a fourier function.
@@ -151,6 +213,7 @@ function set_wing_to_single_bv_fn!(
 
     zero_vorticities!(fil_wing)
     fn = vorticity_density_x_fn(n)
+    @assert(isfinite(fn(0.0)))
     add_vorticity!(wing, filament_locs, fil_wing, strip_idx, fn)
     return
 end
@@ -169,7 +232,7 @@ function set_wing_to_fourier_set!(
     zero_vorticities!(fil_wing)
     for strip = 1 : length(A_vals)
         for n = 0 : length(A_vals[strip]) - 1
-            fn = x->vorticity_density_theta_fn(n)(x) * A_vals[strip][n+1]
+            fn = x->vorticity_density_x_fn(n)(x) * A_vals[strip][n+1]
             add_vorticity!(wing, filament_locs, fil_wing, strip, fn)
         end
     end
@@ -211,6 +274,8 @@ function downwash_2D_fourier_integrals(
     filament_locations :: Vector{Float64}
     )
     @assert(n_max >= 0)
+    @assert(ref_vel != 0)
+
     funcs = get_fourier_integrand_vector(n_max, ref_vel)
     integrals = Vector{Float64}(n_max + 1)
     theta = x_to_theta.(filament_locations)
@@ -228,6 +293,7 @@ function downwash_2D_fourier_integrals(
     end
     return integrals
 end
+
 
 """
 Get integrands for computing the fourier terms. These take theta
@@ -254,6 +320,7 @@ function get_fourier_integrand_vector(n_max :: Int64, ref_vel :: Float64)
     return funcs
 end
 
+
 """
 Computes fourier integrals for all the strips given an ind_vel_fn
 """
@@ -278,9 +345,9 @@ function downwash_2D_fourier_integrals_all_strips(
                 ind_vel_fn, i, n_max, ref_vel, filament_locs
                 )
     end
-
     return integrals
 end
+
 
 """
 Compute self_influence_matrix
@@ -317,37 +384,6 @@ function downwash_2D_fourier_integrals_all_strips(
 end
 
 
-"""
-Memoize a function of strip and chord position returning ThreeDVector
-Useful for expensive functions.
-"""
-function make_memoized_func_of_strip_and_x(f :: Function)
-    d = Dict{(Float64, Float64), ThreeDVector}()
-    function g(strip :: Float64, x :: Float64)
-        @assert(abs(x) <= 1)
-        if !haskey(d, (strip,x))
-            d[(strip, x)] = f(strip, x)
-        end
-        return d[(strip, x)]
-    end
-    return g
-end
-
-"""
-Memoize a function of ThreeDVector returning ThreeDVector
-Useful for expensive functions.
-"""
-function make_memoized_func_of_strip_and_x(f :: Function)
-    d = Dict{ThreeDVector, ThreeDVector}()
-    function g(loc :: ThreeDVector)
-        if !haskey(d, loc)
-            d[loc] = f(loc)
-        end
-        return d[loc]
-    end
-    return g
-end
-
 function downwash_2D_pure_2D_self_fourier_integrals_matrix(
     chord :: WingChordSection,
     filament_positions :: Vector{Float64},
@@ -378,7 +414,7 @@ function downwash_2D_pure_2D_self_fourier_integrals_matrix(
     for s = 0 : n_max
         density_func_s = vorticity_density_theta_fn(s)
         for m = 0 : n_max
-            density_func = vorticity_density_theta_fn(m)
+            density_func = vorticity_density_x_fn(m)
             vort = lump_vorticities(chord, density_func, filament_positions)
             kernal = inf_mat * vort .* density_func_s.(mtheta)
             ws = Spline1D(mtheta, kernal, k=2)
@@ -387,6 +423,7 @@ function downwash_2D_pure_2D_self_fourier_integrals_matrix(
     end
     return a_n
 end
+
 
 function downwash_2D_pure_2D_self_fourier_integrals_matrix(
     wing :: StripDefinedWing,
@@ -404,6 +441,7 @@ function downwash_2D_pure_2D_self_fourier_integrals_matrix(
     end
     return dw
 end
+
 
 function wing_velocity_to_fourier_integrals_vector(
     normal_dir_fn :: Function,
@@ -431,6 +469,7 @@ function wing_velocity_to_fourier_integrals_vector(
 
     return integrals
 end
+
 
 function compute_new_particles_and_wing_fourier_integral_matrix(
     wing :: StripDefinedWing,
@@ -467,7 +506,70 @@ function compute_new_particles_and_wing_fourier_integral_matrix(
             particles[i].vorticity =
                 unit(particles[i].vorticity) * particle_vorts[i]
         end
-        ind_vel_pw = x->ind_vel(fil_wing, x) + ind_vel(particles, x)
+        # The purely 2D bit on the wing.
+        u = (dx, dy)-> (dx<=eps(Float64) && dy<=eps(Float64) ? 0 : dy / (2 * pi * (dy^2 + dx^2)))
+        v = (dx, dy)-> (dx<=eps(Float64) && dy<=eps(Float64) ? 0 :- dx / (2 * pi * (dy^2 + dx^2)))
+        svort_locs = surf_fn.(sti, fil_locs)
+        density_func = vorticity_density_x_fn(n)
+        vort = lump_vorticities(wing.strips[sti], density_func, fil_locs)
+        function ind_vel_2d(x :: ThreeDVector)
+            dx = map(y->x.x - y.x, svort_locs)
+            dy = map(y->x.z - y.z, svort_locs)
+            velu = mapreduce(x->u(x[1], x[2]) * x[3], +, 0.0, zip(dx, dy, vort))
+            velv = mapreduce(x->v(x[1], x[2]) * x[3], +, 0.0, zip(dx, dy, vort))
+            return ThreeDVector(0, velu, velv)
+        end
+        ind_vel_pw = x-> ind_vel(particles, x) + ind_vel(fil_wing, x) + ind_vel_2d(x)
+        return ind_vel_pw
+    end
+
+    nex, ney, nez = nocamber_normal_splines(wing)
+    normal_dir_fn = x->ThreeDVector(nex(x), ney(x), nez(x))
+    deta_dx_dot_c_fn = get_surface_detadx_dot_c_fn(wing)
+    surf_fn = get_surface_fn(wing)
+    mtrx = downwash_2D_fourier_integrals_all_strips(
+        normal_dir_fn, deta_dx_dot_c_fn, surf_fn,
+        length(wing.strips), n_max, ref_vel, reset, fil_locs )
+    return mtrx
+end
+
+
+function compute_new_particles_fourier_integral_matrix(
+    wing :: StripDefinedWing,
+    fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    fil_locs :: Vector{Float64},
+    old_bound_vorticities :: Vector{Float64},
+    ref_vel :: Float64,
+    new_particles :: ThreeDVortexParticleSet,
+    kelvin_particle_indexes :: Vector{Int64},
+    dt :: Float64,
+    ind_vel_external :: Function,
+    n_max :: Int64
+    )
+    @assert(length(wing.strips) > 0)
+    @assert(length(wing.strips) == length(fil_wing.filaments_yp))
+    @assert(isfinite(ref_vel))
+    @assert(length(new_particles) ==
+                length(kelvin_particle_indexes) + length(wing.strips) * 2 + 1)
+    @assert(all(-1 .< fil_locs .< 1))
+    @assert(n_max > 0)
+    @assert(dt > 0)
+
+    ind_vel_np :: Function = x->x # Induced vel excluding new particles. [placeholder for scope]
+    ind_vel_pw :: Function = x->ind_vel(fil_wing, x) + ind_vel(particles, x) # Induced vel due to new particles and wing. [placeholder for scope]
+    function reset(sti :: Int64, n :: Int64)
+        @assert(1 <= sti <= length(wing.strips))
+        @assert(n >= 0)
+        set_wing_to_single_bv_fn!(fil_wing, wing, fil_locs, n, sti)
+        ind_vel_n = x->ind_vel_external(x) + ind_vel(fil_wing, x)    # Is this correct?
+        vf = get_particle_vorticity_function(
+            particles, k_sind, dt, ind_vel_n)
+        particle_vorts = vf(wing_to_bv_vector(fil_wing), old_bound_vorticities)
+        for i = 1 : length(particle_vorts)
+            particles[i].vorticity =
+                unit(particles[i].vorticity) * particle_vorts[i]
+        end
+        ind_vel_pw = x-> ind_vel(particles, x)
         return ind_vel_pw
     end
     nex, ney, nez = nocamber_normal_splines(wing)
@@ -479,6 +581,7 @@ function compute_new_particles_and_wing_fourier_integral_matrix(
         length(wing.strips), n_max, ref_vel, reset, fil_locs )
     return mtrx
 end
+
 
 function solve_new_vortex_particle_vorticities_and_assign!(
     untransformed_wing :: StripDefinedWing,
@@ -513,24 +616,15 @@ function solve_new_vortex_particle_vorticities_and_assign!(
         ref_vel, fil_locs )
 
     # The downwash due to the wing on itself in a 2D sense
-    dw_2d = downwash_2D_pure_2D_self_fourier_integrals_matrix(
-            wing, filament_positions, n_fourier_terms, ref_vel)
+    #=dw_2d = downwash_2D_pure_2D_self_fourier_integrals_matrix(
+            wing, filament_positions, n_fourier_terms, ref_vel)=#
 
     # The downwash due to the wake and free stream
     dw_wake = downwash_2D_fourier_integrals_all_strips(
         normal_dir_fn, deta_fn, surf_fn, ind_vel_external, length(wing.strips),
         n_fourier_terms, ref_vel, fil_locs)
 
-    print("\n\t\tP_W_MTRX:\n")
-    display(p_w_mtrx)
-    print("\n\t\td_w_2d_MTRX:\n")
-    display(dw_2d)
-    print("\n\t\tw_vel_VEC:\n")
-    display(w_vel_vec)
-    print("\n\t\tdw_wake_VEC:\n")
-    display(dw_wake)
-    print("\n#############################################################\n\n")
-    fourier_terms = (p_w_mtrx - dw_2d) \ (w_vel_vec + dw_wake)
+    fourier_terms = p_w_mtrx \ -(w_vel_vec + dw_wake)
     strip_ft = Vector{Vector{Float64}}(length(wing.strips))
     for s = 1 : length(wing.strips)
         idxs = fourier_term_linear_index.(
@@ -547,4 +641,86 @@ function solve_new_vortex_particle_vorticities_and_assign!(
         particles[i].vorticity = particle_vorts[i] * unit(particles[i].vorticity)
     end
     return strip_ft
+end
+
+
+function pressure_distribution(
+    current_fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    old_fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
+    current_wing :: StripDefinedWing,
+    filament_pos :: Vector{Float64},
+    dt :: Float64,
+    ind_vel_fn :: Function,
+    fourier_coeffs :: Vector{Vector{Float64}},
+    density :: Float64
+    )
+    # We evaluate pressure at the centre of each vortex filament.
+    ns = length(current_wing.strips)
+    spos = Vector{Float64}(0.75 : 0.5 : ns + 0.25) # Places on the span.
+    cpos = filament_pos # Places on the chord
+    cidx = Vector{Float64}(length(spos) * length(cpos))
+    locations = Vector{ThreeDVector}(length(spos) * length(cpos))
+    velocities = Vector{ThreeDVector}(length(spos) * length(cpos))
+    spanwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))
+    chordwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))
+    param_loc_s = Vector{Float64}(length(spos) * length(cpos))
+    param_loc_c = Vector{Float64}(length(spos) * length(cpos))
+    pressure = Vector{Float64}(length(spos) * length(cpos))
+    dvortdc = Vector{Float64}(length(spos) * length(cpos))
+    dvortds = Vector{Float64}(length(spos) * length(cpos))
+    for i = 1 : length(spos)
+        for j = 1 : length(cpos)
+            idx = (i - 1) * length(cpos) + j
+            param_loc_s[idx] = spos[i]
+            param_loc_c[idx] = cpos[i]
+            cidx[idx] = round(spos[i])
+        end
+    end
+    slant_cors = Vector{Vector{Float64}}(length(spos))
+    for i = 1 : ns
+        scym, scyp = slant_correction_factors(
+            current_wing, current_fil_wing, cpos, i)
+        slant_cors[i * 2 - 1] = scym
+        slant_cors[i * 2] = scyp
+    end
+
+    surf_fn = get_surface_fn(current_wing)
+    for i = 1 : (length(spos) * length(cpos))
+        sp = param_loc_s[i]
+        cp = param_loc_c[i]
+        sidx = Int(round(sp))
+        locations[i] = surf_fn(sp, cp)
+        # Annoyingly the simple thing to do here is numerical differentiation.
+        spanwise_tang[i] = (surf_fn(sp+0.01, cp) -surf_fn(sp-0.01, cp)) / 0.02
+        chordwise_tang[i] = (surf_fn(sp, cp+0.0001) -surf_fn(sp, cp-0.0001)) / 0.02
+        velocities[i] = ind_vel_fn(locations[i])
+        dvortdc = vorticity_density_x_derivative(fourier_coeffs[Int64(sidx)], cp) * slant_cors[Int64(floor(i/length(cpos))+1)][Int64(cidx[i])]
+        # Averaging of the chordwise vorticity (remembering dirs of filament
+        # is always TE to LE.)
+        # Also the rate of change of strenght of the vortex ring wrt time.
+        if sp < sidx
+            dvortds = (
+                fil_wing.filaments_cw[Int64(sidx * 2 - 1)][Int64(cidx[i])].vorticity
+                + fil_wing.filaments_cw[Int64(sidx * 2)][Int64(cidx[i])].vorticity
+                ) / 2
+            dvdt = mapreduce(x->x[1].vorticity - x[2].vorticity, +, 0.0,
+                            zip(current_fil_wing.filaments_ym[sidx],
+                                old_fil_wing.filaments_ym[sidx])
+                            ) / dt
+        else
+            dvortds = (
+                fil_wing.filaments_cw[Int64(sidx * 2)][Int64(cidx[i])].vorticity
+                + fil_wing.filaments_cw[Int64(sidx * 2 + 1)][Int64(cidx[i])].vorticity
+                ) / 2
+            dvdt = mapreduce(x->x[1].vorticity - x[2].vorticity, +, 0.0,
+                            zip(current_fil_wing.filaments_yp[sidx],
+                                old_fil_wing.filaments_yp[sidx])
+                            ) / dt
+        end
+        pressure[i] = density *
+            (dot(velocities[i], spanwise_tang[i] * dvortds
+                + chordwise_tang[i] * dvortdc) + dvdt)
+    end
+    pressure_field = Spline2D(param_loc_c, param_loc_s, pressure, ky=2)
+    return pressure_field
 end

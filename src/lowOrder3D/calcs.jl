@@ -564,10 +564,12 @@ function ind_vel(
     inducing_filament :: ThreeDStraightVortexFilament,
     measurement_loc :: ThreeDVector
     )
-
     r0 = inducing_filament.end_coord - inducing_filament.start_coord
     r1 = measurement_loc - inducing_filament.start_coord
     r2 = measurement_loc - inducing_filament.end_coord
+    if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
+        return ThreeDVector(0,0,0)
+    end
     # From Katz & Plotkin, Eq(2.72), pg41
     term1 = inducing_filament.vorticity / (4 * pi)
     term2n = cross(r1, r2)
@@ -629,6 +631,110 @@ end
 #= END ThreeDStraightVortexFilament functions =================================#
 
 #===============================================================================
+      ThreeDVortexRing functions
+
+      Initial code: HJAB 2018
+------------------------------------------------------------------------------=#
+function ind_vel(
+    inducing_ring :: ThreeDVortexRing,
+    measurement_loc :: ThreeDVector
+    )
+    return ind_vel(Vector{ThreeDStraightVortexFilament}(inducing_ring),
+                                                            measurement_loc)
+end
+
+function ind_dvortdt(
+    induced_particle  :: ThreeDVortexParticle,
+    inducing_ring :: ThreeDVortexRing
+    )
+    return ind_dvortdt(Vector{ThreeDStraightVortexFilament}(inducing_ring),
+                                                            measurement_loc)
+end
+
+function area(vortex_ring :: ThreeDVortexRing)
+    a = vortex_ring
+    # Gauss-Legendre quadrature
+    x = 1 / sqrt(3)
+    xs = [x, -x, x, -x]
+    ys = [x, x, -x, -x]
+    ws = [1, 1, 1, 1]
+    # Derivatives of a bilinear surface.
+    dfdx = (x,y)-> 0.25 * ((y-1)*a.c1 - (y-1)*a.c2 + (y+1)*a.c3 - (y+1)*a.c4)
+    dfdy = (x,y)-> 0.25 * ((x-1)*a.c1 - (x+1)*a.c2 + (x+1)*a.c3 - (x-1)*a.c4)
+    integrand = (x, y)->abs(cross(dfdx(x, y), dfdy(x,y)))
+    integral = mapreduce(x->x[1] * integrand(x[2],x[3]),
+                        +, 0.0, zip(ws, xs, ys))
+    return integral
+end
+
+function normal(vortex_ring :: ThreeDVortexRing)
+    return cross(tangent_dir1(vortex_ring), tangent_dir2(vortex_ring))
+end
+
+function tangent_dir1(vortex_ring :: ThreeDVortexRing)
+    a = vortex_ring
+    # Based on bilinear interpolation at (0,0)
+    return 0.25 * (-a.c1 + a.c2 + a.c3 - a.c4)
+end
+
+function tangent_dir2(vortex_ring :: ThreeDVortexRing)
+    a = vortex_ring
+    # Based on bilinear interpolation at (0,0)
+    return 0.25 * (-a.c1 - a.c2 + a.c3 + a.c4)
+end
+
+function centre(vortex_ring :: ThreeDVortexRing)
+    a = ThreeDVortexRing
+    return (a.c1 + a.c2 + a.c3 + a.c4) / 4
+end
+
+function pressure_difference(
+    vortex_ring :: ThreeDVortexRing,
+    ind_vel_fn :: Function,
+    density :: Float64,
+    old_circ_strength :: Float64,
+    dt :: Float64,
+    circ_ip :: Float64, # Adjacent ring circulation strengths in i / j plus dir.
+    circ_jp :: Float64
+    )
+    @assert(density >= 0)
+    @assert(isfinite(old_circ_strength))
+    @assert(isfinite(circ_ip))
+    @assert(isfinite(circ_jp))
+    @assert(isfinite(vortex_ring.c1))
+    # Based on Katz & Plotkin 13.12 F (pg. 427)
+    a = vortex_ring
+    x = centre(vortex_ring)
+    tangent1 = tangent_dir1(vortex_ring)
+    tangent2 = tangent_dir2(vortex_ring)
+    c_len = abs(a.c2 - a.c1 + a.c3 - a.c4) / 2
+    b_len = abs(a.c4 + a.c3 - a.c2 - a.c1) / 2
+    # B differences
+    di = (circ_ip - a.strength) / c_len
+    dj = (circ_jp - a.strength) / b_len
+    vel = ind_vel_fn(x)
+    p = density * (dot(vel, tagent1 * di + tangent2 * dj)) +
+        (a.strength - old_circ_strength) / dt
+    return p
+end
+
+function force(
+    vortex_ring :: ThreeDVortexRing,
+    ind_vel_fn :: Function,
+    density :: Float64,
+    old_circ_strength :: Float64,
+    dt :: Float64,
+    circ_ip :: Float64, # Adjacent ring circulation strengths in i / j plus dir.
+    circ_jp :: Float64)
+    dp = pressure_difference(vortex_ring, ind_vel_fn, density,
+        old_circ_strength, dt, circ_ip, circ_jp)
+    f = dp * area(vortex_ring)
+    return f
+end
+#= END ThreeDVortexRing functions =============================================#
+
+
+#===============================================================================
       ThreeDSpanwiseFilamentWingRepresentation functions
 
       Initial code: HJAB 2018
@@ -643,6 +749,8 @@ function transform_wing_location(
             mod!(nwing.filaments_ym[i][j].end_coord)
             mod!(nwing.filaments_yp[i][j].start_coord)
             mod!(nwing.filaments_yp[i][j].end_coord)
+            mod!(nwing.filaments_cw[i][j].start_coord)
+            mod!(nwing.filaments_cw[i][j].end_coord)
         end
     end
     return nwing
@@ -1035,17 +1143,25 @@ function ind_vel(
     strip_idx :: Int64
     )
     @assert(0 < strip_idx <= length(fil_wing.filaments_ym))
-    return sum(ind_vel(fil_wing.filaments_ym[strip_idx], measurement_loc) +
-        ind_vel(fil_wing.filaments_yp[strip_idx], measurement_loc))
+    return sum(ind_vel(fil_wing.filaments_ym[strip_idx], measurement_loc)) +
+        sum(ind_vel(fil_wing.filaments_yp[strip_idx], measurement_loc)) +
+        sum(ind_vel(fil_wing.filaments_cw[strip_idx * 2], measurement_loc)) +
+        sum(ind_vel(fil_wing.filaments_cw[strip_idx * 2], measurement_loc)) +
+        sum(ind_vel(fil_wing.filaments_cw[strip_idx * 2], measurement_loc))
 end
 
 function ind_vel(
     fil_wing :: ThreeDSpanwiseFilamentWingRepresentation,
     measurement_loc :: ThreeDVector
     )
-    return mapreduce(
+    strips = mapreduce(
         x->ind_vel(fil_wing, measurement_loc, x),
         +, ThreeDVector(0,0,0), 1:length(fil_wing.filaments_ym))
+    chords = mapreduce(
+        x->sum(ind_vel(x, measurement_loc)),
+        +, ThreeDVector(0,0,0), vec(fil_wing.filaments_cw)
+    )
+    return strips #+ chords
 end
 
 function ind_dvortdt(
@@ -1064,9 +1180,12 @@ function ind_dvortdt(
     fil_wing :: ThreeDSpanwiseFilamentWingRepresentation
     )
 
-    return mapreduce(
-        x->ind_dvortdt(induced_particle, fil_wing, x),
-        +, ThreeDVector(0,0,0), 1:length(fil_wing.filaments_ym))
+
+    fils = convect(Vector{ThreeDStraightVortexFilament}, fil_wing)
+    effect = mapreduce(
+        x->ind_dvortdt(induced_particle, x),
+        +, ThreeDVector(0,0,0), fils)
+    return effect
 end
 #= END ThreeDSpanwiseFilamentWingRepresentation functions =====================#
 
@@ -1139,30 +1258,63 @@ function build_vortex_filament_wing_geometry(
     fil_wing = ThreeDSpanwiseFilamentWingRepresentation(n_strips, n_fil)
     surf_func = get_surface_fn(wing)
     for i in 1 : n_fil  # tip y_minus
-        fil_wing.filaments_ym[1][i].start_coord =
-            surf_func(0.0, chord_positions[i])
+        coord = surf_func(0.0, chord_positions[i])
+        fil_wing.filaments_ym[1][i].start_coord = coord
+        if i == 1
+            fil_wing.filaments_cw[1][i].start_coord = coord
+        elseif i < n_fil
+            fil_wing.filaments_cw[1][i].start_coord = coord
+            fil_wing.filaments_cw[1][i - 1].end_coord = coord
+        else
+            fil_wing.filaments_cw[1][i - 1].end_coord = coord
+        end
     end
     for i_f in 1 : n_fil # In between the strips
         for i_s in 2 : n_strips
             coord = surf_func(i_s - 0.5, chord_positions[i_f])
             fil_wing.filaments_ym[i_s][i_f].start_coord = coord
             fil_wing.filaments_yp[i_s - 1][i_f].end_coord = coord
+            if i_f == 1
+                fil_wing.filaments_cw[i_s * 2 - 1][i_f].start_coord = coord
+            elseif i_f < n_fil
+                fil_wing.filaments_cw[i_s * 2 - 1][i_f].start_coord = coord
+                fil_wing.filaments_cw[i_s * 2 - 1][i_f - 1].end_coord = coord
+            else
+                fil_wing.filaments_cw[i_s * 2 - 1][i_f - 1].end_coord = coord
+            end
         end
     end
     for i in 1 : n_fil # tip y_plus
-        fil_wing.filaments_yp[end][i].end_coord =
-            surf_func(n_strips+1, chord_positions[i])
+        coord = surf_func(n_strips + 1, chord_positions[i])
+        fil_wing.filaments_yp[end][i].end_coord = coord
+        if i == 1
+            fil_wing.filaments_cw[end][i].start_coord = coord
+        elseif i < n_fil
+            fil_wing.filaments_cw[end][i].start_coord = coord
+            fil_wing.filaments_cw[end][i - 1].end_coord = coord
+        else
+            fil_wing.filaments_cw[end][i - 1].end_coord = coord
+        end
     end
     for i_f in 1 : n_fil # on the strip lines
         for i_s in 1 : n_strips
             coord = surf_func(i_s, chord_positions[i_f])
             fil_wing.filaments_ym[i_s][i_f].end_coord = coord
             fil_wing.filaments_yp[i_s][i_f].start_coord = coord
+            if i_f == 1
+                fil_wing.filaments_cw[i_s * 2][i_f].start_coord = coord
+            elseif i_f < n_fil
+                fil_wing.filaments_cw[i_s * 2][i_f].start_coord = coord
+                fil_wing.filaments_cw[i_s * 2][i_f - 1].end_coord = coord
+            else
+                fil_wing.filaments_cw[i_s * 2][i_f - 1].end_coord = coord
+            end
         end
     end
     return fil_wing
 end
 
+#= END VortexParticleWakeLUATATSolution functions =============================#
 
 function transform_ThreeDVectors(
 	func :: Function,
@@ -1196,6 +1348,7 @@ function transform_ThreeDVectors(
 	for i = 1 : length(w.filaments_ym)
 		w.filaments_yp[i] = transform_ThreeDVectors(func, w.filaments_yp[i])
 		w.filaments_ym[i] = transform_ThreeDVectors(func, w.filaments_ym[i])
+        w.filaments_cw[i] = transform_ThreeDVectors(func, w.filaments_cw[i])
 	end
 	return w
 end
@@ -1226,4 +1379,54 @@ function transform_ThreeDVectors(
 		transform_ThreeDVectors(func, w.tip_yminus_TE_location)
 	return w
 end
-#= END VortexParticleWakeLUATATSolution functions =============================#
+
+#===============================================================================
+    Integral remaps
+
+    HJAB 2018
+===============================================================================#
+
+function telles_quadratic_remap(
+    points :: Vector{Float64},
+    weights :: Vector{Float64},
+    singularity_location :: Float64)
+    @assert(all(-1 .<= points .<= 1))
+    @assert(abs(singularity_location) == 1)
+    np =  (1 - points.*points) .* (singularity_location +
+        sqrt(singularity_location*singularity_location - 1)) / 2 + points
+    nw =  (-points .* (singularity_location +
+        sqrt(singularity_location*singularity_location - 1)) + 1) .* weights
+    return np, nw
+end
+
+function linear_remap(
+    points :: Vector{T1},
+    weights :: Vector{T1},
+    original_range :: Vector{T2},
+    new_range :: Vector{T3}
+    ) where {T1 <: Real, T2 <: Number,  T3 <: Number}
+
+    @assert(all(minimum(original_range) .<= points .<= maximum(original_range)))
+    @assert(length(original_range) == 2)
+    @assert(length(new_range) == 2)
+    @assert(all(isfinite.(original_range)))
+    @assert(all(isfinite.(new_range)))
+
+    dx_ratio = (new_range[2] - new_range[1]) /
+            (original_range[2] - original_range[1])
+    offset = new_range[1] - original_range[1]
+    nw = weights * dx_ratio
+    np = (points - original_range[1]) * dx_ratio + offset + original_range[1]
+    return np, nw
+end
+
+function exception_or_nonfinite_to_false(f::Function, arg::Float64)
+    b = true
+    try
+        b = isfinite(f(arg))
+    catch
+        b = false
+    end
+    return b
+end
+#= END Integral remaps functions ==============================================#
