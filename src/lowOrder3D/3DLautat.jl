@@ -519,7 +519,7 @@ function compute_new_particles_and_wing_fourier_integral_matrix(
             velv = mapreduce(x->v(x[1], x[2]) * x[3], +, 0.0, zip(dx, dy, vort))
             return ThreeDVector(0, velu, velv)
         end
-        ind_vel_pw = x-> ind_vel(particles, x) + ind_vel(fil_wing, x) + ind_vel_2d(x)
+        ind_vel_pw = x-> ind_vel(particles, x) + ind_vel(fil_wing, x) - ind_vel_2d(x)
         return ind_vel_pw
     end
 
@@ -624,7 +624,7 @@ function solve_new_vortex_particle_vorticities_and_assign!(
         normal_dir_fn, deta_fn, surf_fn, ind_vel_external, length(wing.strips),
         n_fourier_terms, ref_vel, fil_locs)
 
-    fourier_terms = p_w_mtrx \ -(w_vel_vec + dw_wake)
+    fourier_terms = (p_w_mtrx - eye(size(p_w_mtrx)[1])) \ -(w_vel_vec + dw_wake)
     strip_ft = Vector{Vector{Float64}}(length(wing.strips))
     for s = 1 : length(wing.strips)
         idxs = fourier_term_linear_index.(
@@ -656,26 +656,30 @@ function pressure_distribution(
     )
     # We evaluate pressure at the centre of each vortex filament.
     ns = length(current_wing.strips)
-    spos = Vector{Float64}(0.75 : 0.5 : ns + 0.25) # Places on the span.
-    cpos = filament_pos # Places on the chord
-    cidx = Vector{Float64}(length(spos) * length(cpos))
-    locations = Vector{ThreeDVector}(length(spos) * length(cpos))
-    velocities = Vector{ThreeDVector}(length(spos) * length(cpos))
-    spanwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))
-    chordwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))
-    param_loc_s = Vector{Float64}(length(spos) * length(cpos))
-    param_loc_c = Vector{Float64}(length(spos) * length(cpos))
-    pressure = Vector{Float64}(length(spos) * length(cpos))
-    dvortdc = Vector{Float64}(length(spos) * length(cpos))
-    dvortds = Vector{Float64}(length(spos) * length(cpos))
+    spos = Vector{Float64}(0.75 : 0.5 : ns + 0.25)  # Places on the span.
+    cpos = filament_pos                             # Places on the chord
+    cidx = Vector{Int64}(length(spos) * length(cpos)) # The idx on corresponding to cpos
+    sidx = Vector{Int64}(length(spos) * length(cpos)) # The idx on corresponding to spos
+    locations = Vector{ThreeDVector}(length(spos) * length(cpos)) # Pressure eval locs
+    velocities = Vector{ThreeDVector}(length(spos) * length(cpos))  # Flow velocity at locs
+    spanwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))   # tangent in s dir
+    chordwise_tang = Vector{ThreeDVector}(length(spos) * length(cpos))  # tangent in c dir
+    param_loc_s = Vector{Float64}(length(spos) * length(cpos))  # parametric spanwise loc
+    param_loc_c = Vector{Float64}(length(spos) * length(cpos))  # parametric chordwise loc
+    pressure = Vector{Float64}(length(spos) * length(cpos)) # Pressure at locations
+    dvortdc = Vector{Float64}(length(spos) * length(cpos))  # Vorticity deriv chordwise
+    dvortds = Vector{Float64}(length(spos) * length(cpos))  # Vorticity deriv spanwise
+
     for i = 1 : length(spos)
         for j = 1 : length(cpos)
             idx = (i - 1) * length(cpos) + j
             param_loc_s[idx] = spos[i]
-            param_loc_c[idx] = cpos[i]
-            cidx[idx] = round(spos[i])
+            param_loc_c[idx] = cpos[j]
+            sidx[idx] = i
+            cidx[idx] = j
         end
     end
+
     slant_cors = Vector{Vector{Float64}}(length(spos))
     for i = 1 : ns
         scym, scyp = slant_correction_factors(
@@ -686,41 +690,43 @@ function pressure_distribution(
 
     surf_fn = get_surface_fn(current_wing)
     for i = 1 : (length(spos) * length(cpos))
-        sp = param_loc_s[i]
-        cp = param_loc_c[i]
-        sidx = Int(round(sp))
+        sp = param_loc_s[i] # Span parametric coord
+        stripidx = Int64(round(sp))
+        cp = param_loc_c[i] # Chord parametric coord
         locations[i] = surf_fn(sp, cp)
         # Annoyingly the simple thing to do here is numerical differentiation.
-        spanwise_tang[i] = (surf_fn(sp+0.01, cp) -surf_fn(sp-0.01, cp)) / 0.02
+        spanwise_tang[i] = (surf_fn(sp+0.0001, cp) -surf_fn(sp-0.0001, cp)) / 0.02
         chordwise_tang[i] = (surf_fn(sp, cp+0.0001) -surf_fn(sp, cp-0.0001)) / 0.02
         velocities[i] = ind_vel_fn(locations[i])
-        dvortdc = vorticity_density_x_derivative(fourier_coeffs[Int64(sidx)], cp) * slant_cors[Int64(floor(i/length(cpos))+1)][Int64(cidx[i])]
+        dvortdc = vorticity_density_x_derivative(fourier_coeffs[stripidx], cp) *
+            slant_cors[stripidx][cidx[i]]
         # Averaging of the chordwise vorticity (remembering dirs of filament
         # is always TE to LE.)
         # Also the rate of change of strenght of the vortex ring wrt time.
-        if sp < sidx
-            dvortds = (
-                fil_wing.filaments_cw[Int64(sidx * 2 - 1)][Int64(cidx[i])].vorticity
-                + fil_wing.filaments_cw[Int64(sidx * 2)][Int64(cidx[i])].vorticity
-                ) / 2
+        fcidx = cidx[i] == length(cpos) ? cidx[i] - 1 : cidx[i]
+        dvortds = (
+            fil_wing.filaments_cw[sidx[i]][fcidx].vorticity
+            + fil_wing.filaments_cw[sidx[i] + 1][fcidx].vorticity
+            ) / 2
+        if sp < round(sp)
             dvdt = mapreduce(x->x[1].vorticity - x[2].vorticity, +, 0.0,
-                            zip(current_fil_wing.filaments_ym[sidx],
-                                old_fil_wing.filaments_ym[sidx])
+                            zip(current_fil_wing.filaments_ym[stripidx],
+                                old_fil_wing.filaments_ym[stripidx])
                             ) / dt
         else
-            dvortds = (
-                fil_wing.filaments_cw[Int64(sidx * 2)][Int64(cidx[i])].vorticity
-                + fil_wing.filaments_cw[Int64(sidx * 2 + 1)][Int64(cidx[i])].vorticity
-                ) / 2
             dvdt = mapreduce(x->x[1].vorticity - x[2].vorticity, +, 0.0,
-                            zip(current_fil_wing.filaments_yp[sidx],
-                                old_fil_wing.filaments_yp[sidx])
+                            zip(current_fil_wing.filaments_yp[stripidx],
+                                old_fil_wing.filaments_yp[stripidx])
                             ) / dt
         end
         pressure[i] = density *
+            ( dvdt)
+        #=pressure[i] = density *
             (dot(velocities[i], spanwise_tang[i] * dvortds
-                + chordwise_tang[i] * dvortdc) + dvdt)
+                + chordwise_tang[i] * dvortdc) + dvdt)=#
     end
-    pressure_field = Spline2D(param_loc_c, param_loc_s, pressure, ky=2)
+    println(pressure)
+    pressure_field = Spline2D(param_loc_c, param_loc_s,
+                                    pressure, kx=1, ky=1, s=length(param_loc_c))
     return pressure_field
 end

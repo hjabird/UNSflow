@@ -784,11 +784,11 @@ function slant_correction_factors(
         return 1. / dot(unit(b-a), spanwise)
     end
     for i = 1 : size(filament_locs)[1]
-        corrections_ym[i] = corr(fil_wing.filaments_ym[strip_idx][i])
-        corrections_yp[i] = corr(fil_wing.filaments_yp[strip_idx][i])
+        corrections_ym[i] = abs.(corr(fil_wing.filaments_ym[strip_idx][i]))
+        corrections_yp[i] = abs.(corr(fil_wing.filaments_yp[strip_idx][i]))
     end
-    @assert(all(abs.(corrections_ym) .>= 1.0))
-    @assert(all(abs.(corrections_yp) .>= 1.0))
+    @assert(all(corrections_ym .>= 1.0 * (1 - eps(Float64))))
+    @assert(all(corrections_yp .>= 1.0 * (1 - eps(Float64))))
     return corrections_ym, corrections_yp
 end
 
@@ -1348,8 +1348,10 @@ function transform_ThreeDVectors(
 	for i = 1 : length(w.filaments_ym)
 		w.filaments_yp[i] = transform_ThreeDVectors(func, w.filaments_yp[i])
 		w.filaments_ym[i] = transform_ThreeDVectors(func, w.filaments_ym[i])
-        w.filaments_cw[i] = transform_ThreeDVectors(func, w.filaments_cw[i])
 	end
+    for i = 1 : length(w.filaments_cw)
+        w.filaments_cw[i] = transform_ThreeDVectors(func, w.filaments_cw[i])
+    end
 	return w
 end
 

@@ -27,7 +27,7 @@ import WriteVTK  # We'll use this package to output to VTK for visualisation.
 y_span = 1
 y_values = y_span * sin.(linspace(-pi/2, pi/2, 7))
 print(string("y_values: ", y_values, "\n"))
-c_fn = x -> 1 #- 0.5* x ^2
+c_fn = x -> 1 #- 0.2* x ^2
 c_values = c_fn.(y_values / y_span)
 z_fn = z -> 0
 z_values = z_fn.(y_values / y_span)
@@ -58,18 +58,20 @@ original_fil_wing = build_vortex_filament_wing_geometry(
     )
 fil_wing = deepcopy(original_fil_wing)
 
-kinem = ThreeDCoordinateTransform((x,t)->x + sin(0) * ThreeDVector(0,0,0.2 * x.y^2))
+kinem = ThreeDCoordinateTransform((x,t)->rotate_about_y(x, 0.4))
 k_sloc = kelvin_particles_span_shedding_locations(t0wing, 0.1)
 k_sind = k_particle_shedding_locs_to_bv_index(k_sloc, length(t0wing.strips))
-free_stream = x->ThreeDVector(1.0, 0.0, 0.4)
+free_stream = x->ThreeDVector(0.921061, 0.0, 0.0) #0.4 rad
 wake = ThreeDVortexParticleSet()
-n_fourier_terms = 3
-dt = 0.075
+n_fourier_terms = 2
+dt = 0.025
 old_bvs = zeros(length(t0wing.strips) * 2)
 
 fil_wing = transform_ThreeDVectors(x->kinem(x), original_fil_wing)
 old_fil_wing = fil_wing
-particles = shed_initial_particles(t0wing, free_stream, k_sloc, dt, 0.1)
+fil_wing = transform_ThreeDVectors(x->kinem(x), old_fil_wing)
+wing = transform_ThreeDVectors(x->kinem(x), t0wing)
+particles = shed_initial_particles(wing, free_stream, k_sloc, dt, 0.1)
 ind_vel_external = x->free_stream(x)
 f_terms = solve_new_vortex_particle_vorticities_and_assign!(
     t0wing, fil_wing, kinem,
@@ -81,7 +83,7 @@ old_bvs = wing_to_bv_vector(fil_wing)
 wake += particles
 print(string("Fourier terms: ", f_terms, "\n"))
 
-for n = 1 : 1
+for n = 1 : 90
     # Convection
     e_ind_vel = x->free_stream(x) + ind_vel(fil_wing, x)
     e_ind_dvort = x->ThreeDVector(0,0,0) #ind_dvortdt(x, fil_wing)
@@ -107,8 +109,14 @@ for n = 1 : 1
     print(string("Fourier terms: ", f_terms, "\n"))
 end
 
-pressure_distribution(fil_wing, old_fil_wing, t0wing, filament_positions, dt,
-    ind_vel_external, f_terms, 1.0)
+fil_wing = transform_ThreeDVectors(x->kinem(x), original_fil_wing)
+ind_vel_p = x->ind_vel_external(x) + ind_vel(fil_wing, x) + ind_vel(wake, x)
+pd_fn = pressure_distribution(fil_wing, old_fil_wing, t0wing, filament_positions, dt,
+    ind_vel_p, f_terms, 1.0)
+pd_ys = [j for j = 0.75:0.5:length(t0wing.strips)+0.25, i = 1 : length(filament_positions)]
+pd_xs = [filament_positions[i] for j = 0.75:0.5:length(t0wing.strips)+0.25, i = 1 : length(filament_positions)]
+pdist = pd_fn.(pd_xs, pd_ys)
+print(pdist)
 
 # VKT EXPORT ===================================================================
 fils = convert(Vector{ThreeDStraightVortexFilament}, fil_wing)

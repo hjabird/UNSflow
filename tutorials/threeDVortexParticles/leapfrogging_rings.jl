@@ -23,18 +23,18 @@ using WriteVTK  # We'll use this package to output to VTK for visualisation.
 
 #-------------------------- User (that's you) parameters ---------------------=#
 # ODE integration parameters
-const num_steps = 2
-const dt = 0.1
+num_steps = 2000
+dt = 0.01
 # Options: euler_forward_step!, explicit_midpoint_step!
 ode_method = euler_forward_step!
 # Data saving parameters
 basepath = "./output/leapfrogging_rings_"   # Where to write our output files
-const save_every = 10                       # Save every 10 steps.
+save_every = 10                       # Save every 10 steps.
 # Initial conditions
-const ring_strength = [1., 1.]
-const ring_particles = [3, 3]
-const ring_radii = [1., 1.]
-const ring_locations = [0., 1.]
+ring_strength = [1., 1.]
+ring_particles = [30, 30]
+ring_radii = [1., 1.]
+ring_locations = [0., 1.]
 # options: singular, planetary, exponential, winckelmans, tanh, gaussian,
 # and super_gaussian
 reduction_factor_fn, vorticity_fraction_fn = threed_winckelmans_kernels()
@@ -43,19 +43,21 @@ reduction_factor_fn, vorticity_fraction_fn = threed_winckelmans_kernels()
 num_rings = size(ring_particles)[1]
 particles = Vector{ThreeDVortexParticle}()
 for i = 1 : num_rings
-    centre = ThreeDVector(ring_locations[i], 0., 0.)
-    normal = ThreeDVector(1., 0., 0.)
-    radius = ring_radii[i]
+    c = ThreeDVector(ring_locations[i], 0., 0.)
+    n = ThreeDVector(1., 0., 0.)
+    r = ring_radii[i]
     strength = ring_strength[i]
     n_ring_particles = ring_particles[i]
     ring = vortex_particle_ring(
-        centre, normal, radius, strength, n_ring_particles
+        c, n, r, strength, n_ring_particles
         )
     particles = [particles; ring]
 end
 num_particles = size(particles)[1]
 
 #=-------------------------- ODE time integration ----------------------------=#
+println("Integrating in time...")
+tic()
 for i = 1 : num_steps
     # Save the current state to vtk if required
     if (i - 1) % save_every == 0
@@ -78,5 +80,5 @@ for i = 1 : num_steps
     particles = ode_method(particles, dt,
         reduction_factor_fn, vorticity_fraction_fn)
 end
-
+toc()
 #=------------------- Now repeat until it doesn't blow up --------------------=#

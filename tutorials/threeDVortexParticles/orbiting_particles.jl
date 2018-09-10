@@ -43,8 +43,8 @@ particle1 = ThreeDVortexParticle(
 )
 
 particle2 = deepcopy(particle1)
-particle2.coord = [1., 0., 0.]      # We can also assign to our second particle.
-particle2.vorticity = [0., 0., 0.5]
+particle2.coord = ThreeDVector([1., 0., 0.])      # We can also assign to our second particle.
+particle2.vorticity = convert(ThreeDVector, [0., 0., 0.5])
 particle2.size = 0.08
 
 # options: singular, planetary, exponential, winckelmans, tanh, gaussian,

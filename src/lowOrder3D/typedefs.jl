@@ -334,6 +334,44 @@ end
 function Base.isfinite(a::ThreeDVector)
     return isfinite(a.x) && isfinite(a.y) && isfinite(a.z)
 end
+
+function rotate_about_x(point::ThreeDVector, angle :: Float64)
+    s = sin(angle)
+    c = cos(angle)
+    mtrw = [1 0 0; 0 c -s; 0 s c]
+    return convert(ThreeDVector, mtrw * convert(Vector{Float64}, point))
+end
+
+function rotate_about_y(point::ThreeDVector, angle :: Float64)
+    s = sin(angle)
+    c = cos(angle)
+    mtrw = [c 0 s; 0 1 0; -s 0 c]
+    return convert(ThreeDVector, mtrw * convert(Vector{Float64}, point))
+end
+
+function rotate_about_z(point::ThreeDVector, angle :: Float64)
+    s = sin(angle)
+    c = cos(angle)
+    mtrw = [c -s 0; s c 0; 0 0 1]
+    return convert(ThreeDVector, mtrw * convert(Vector{Float64}, point))
+end
+
+function rotate_about_axis(
+    point::ThreeDVector,
+    axis :: ThreeDVector,
+    angle :: Float64)
+    a = unit(axis)
+    e = a.x
+    f = a.y
+    g = a.z
+    s = sin(angle)
+    c = cos(angle)
+    mtrw = [e*e*(1-c)+c     e*f*(1-c)-g*s   g*e*(1-c)+f*s;
+            e*f*(1-c)+f*c   f*f*(1-c)+c     g*f*(1-c)-e*s;
+            e*g*(1-c)-g*c   g*f*(1-c)+e*s   g*g*(1-c)+c     ]
+    return convert(ThreeDVector, mtrw * convert(Vector{Float64}, point))
+end
+
 #= END ThreeDVector ----------------------------------------------------------=#
 
 #===============================================================================
