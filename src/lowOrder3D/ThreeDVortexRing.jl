@@ -1,5 +1,5 @@
 #===============================================================================
-    ThreeDVortexRing
+    ThreeDVortexRing.jl
 
     Representation of a singular vortex filament ring.
 
@@ -23,7 +23,7 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-type ThreeDVortexRing
+type ThreeDVortexRing <: ThreeDVorticity
     c1 :: ThreeDVector
     c2 :: ThreeDVector
     c3 :: ThreeDVector
@@ -66,4 +66,54 @@ function convert(::Vector{ThreeDStraightVortexFilament}, a::ThreeDVortexRing)
     b[4] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
     return b
 end
+
+function centre(ring::ThreeDVortexRing)
+    return (ring.c1 + ring.c2 + ring.c3 + ring.c4) / 4
+end
+
+function effective_radius(ring::ThreeDVortexRing)
+    c = centre(ring)
+    return maximum([
+        abs(ring.c1 - c),
+        abs(ring.c2 - c),
+        abs(ring.c3 - c),
+        abs(ring.c4 - c),
+    ])
+end
+
+function vorticity(ring::ThreeDVortexRing)
+    return mapreduce(vorticity, ThreeDVector(0,0,0), +,
+        convert(Vector{ThreeDStraightVortexFilament}(ring)))
+end
+
+function induced_velocity(
+    inducing_ring :: ThreeDVortexRing,
+    measurement_loc :: ThreeDVector
+    )
+    fils = convert(Vector{ThreeDStraightVortexFilament}, ring)
+    return mapreduce(x->induced_velocity(x, measurement_loc),
+        ThreeDVector(0,0,0), +, fils)
+end
+
+function induced_velocity_curl(
+    ring :: ThreeDVortexRing,
+    measurement_point :: ThreeDVector
+    )
+    fils = convert(Vector{ThreeDStraightVortexFilament}, ring)
+    return mapreduce(x->induced_velocity(x, measurement_loc),
+        [0. 0. 0.; 0. 0. 0.; 0. 0. 0.], +, fils)
+end
+
+function euler!(a::ThreeDVortexRing, b::ThreeDVorticityBody, dt::Real)
+    v1 = induced_velocity(b, a.c1)
+    v2 = induced_velocity(b, a.c2)
+    v3 = induced_velocity(b, a.c3)
+    v4 = induced_velocity(b, a.c4)
+    c1 += v1 * dt
+    c2 += v2 * dt
+    c3 += v3 * dt
+    c4 += v4 * dt
+    return
+end
+
 #= END ThreeDVortexRing ------------------------------------------------------=#

@@ -215,40 +215,6 @@ end
 
       Initial code: HJAB 2018
 ------------------------------------------------------------------------------=#
-function ind_vel(
-    inducing_filament :: ThreeDStraightVortexFilament,
-    measurement_loc :: ThreeDVector
-    )
-    r0 = inducing_filament.end_coord - inducing_filament.start_coord
-    r1 = measurement_loc - inducing_filament.start_coord
-    r2 = measurement_loc - inducing_filament.end_coord
-    if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
-        return ThreeDVector(0,0,0)
-    end
-    # From Katz & Plotkin, Eq(2.72), pg41
-    term1 = inducing_filament.vorticity / (4 * pi)
-    term2n = cross(r1, r2)
-    term2d = abs(cross(r1, r2)) ^ 2
-    term3 = dot(r0, unit(r1) - unit(r2))
-    vel =  term1 * (term2n / term2d) * term3
-    vel = (!isfinite(vel) ? ThreeDVector(0,0,0) : vel)
-    return vel
-end
-
-function ind_vel(
-    inducing_filament :: ThreeDStraightVortexFilament,
-    measurement_locs :: Vector{ThreeDVector}
-    )
-    return map(x->ind_vel(inducing_filament, x), measurement_locs)
-end
-
-function ind_vel(
-    inducing_filaments :: Vector{ThreeDStraightVortexFilament},
-    measurement_loc :: ThreeDVector
-    )
-    return map(x->ind_vel(x, measurement_loc), inducing_filaments)
-end
-
 function ind_dvortdt(
     induced_particle :: ThreeDVortexParticle,
     inducing_filament :: ThreeDStraightVortexFilament
