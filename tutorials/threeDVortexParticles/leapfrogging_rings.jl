@@ -8,16 +8,8 @@ h.bird.1@research.gla.ac.uk
 ===============================================================================#
 
 #=--------------------------- Dependencies -----------------------------------=#
-using Dierckx
-using SpecialFunctions
-import Base.size
-include("../../src/kinem.jl")
-include("../../src/utils.jl")
-include("../../src/delVort.jl")
-include("../../src/lowOrder2D/typedefs.jl")
-include("../../src/lowOrder2D/calcs.jl")
-include("../../src/lowOrder3D/typedefs.jl")
-include("../../src/lowOrder3D/calcs.jl")
+include("../../src/lowOrder3D/ThreeDVorticitySimpleCollector.jl")
+include("../../src/lowOrder3D/ThreeDVortexParticle.jl")
 include("ThreeDVortexParticleFlowFeatures.jl")
 using WriteVTK  # We'll use this package to output to VTK for visualisation.
 
@@ -25,8 +17,6 @@ using WriteVTK  # We'll use this package to output to VTK for visualisation.
 # ODE integration parameters
 num_steps = 2000
 dt = 0.01
-# Options: euler_forward_step!, explicit_midpoint_step!
-ode_method = euler_forward_step!
 # Data saving parameters
 basepath = "./output/leapfrogging_rings_"   # Where to write our output files
 save_every = 10                       # Save every 10 steps.
@@ -35,13 +25,10 @@ ring_strength = [1., 1.]
 ring_particles = [30, 30]
 ring_radii = [1., 1.]
 ring_locations = [0., 1.]
-# options: singular, planetary, exponential, winckelmans, tanh, gaussian,
-# and super_gaussian
-reduction_factor_fn, vorticity_fraction_fn = threed_winckelmans_kernels()
 
 #=---------------------- Automated problem setup -----------------------------=#
 num_rings = size(ring_particles)[1]
-particles = Vector{ThreeDVortexParticle}()
+particles = ThreeDVorticitySimpleCollector()
 for i = 1 : num_rings
     c = ThreeDVector(ring_locations[i], 0., 0.)
     n = ThreeDVector(1., 0., 0.)
@@ -49,9 +36,11 @@ for i = 1 : num_rings
     strength = ring_strength[i]
     n_ring_particles = ring_particles[i]
     ring = vortex_particle_ring(
-        c, n, r, strength, n_ring_particles
+        c, n, r, strength, n_ring_particles, threed_winckelmans_kernels()
         )
-    particles = [particles; ring]
+    particles = ThreeDVorticitySimpleCollector(
+        get_children(particles),
+        get_children(ring))
 end
 num_particles = size(particles)[1]
 
@@ -77,8 +66,7 @@ for i = 1 : num_steps
     end
 
     # Calculate the next iteration
-    particles = ode_method(particles, dt,
-        reduction_factor_fn, vorticity_fraction_fn)
+    euler!(particles, particles, dt)
 end
 toc()
 #=------------------- Now repeat until it doesn't blow up --------------------=#

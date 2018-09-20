@@ -11,24 +11,20 @@ h.bird.1@research.gla.ac.uk
 
 ===============================================================================#
 
-
-include("../../src/lowOrder3D/typedefs.jl")
-
-
 """ Generates an array of vortex particles representing a vortex ring"""
 function vortex_particle_ring(
     centre::ThreeDVector,
     normal_to_ring::ThreeDVector,
     radius::Float64,
     strength::Float64,
-    num_particles::Int64
+    num_particles::Int64,
+    kernel::ThreeDVortexRegularisationFunctions
     )
 
     @assert(radius > 0)
     @assert(abs(normal_to_ring) > 0)
     @assert(num_particles >= 3)
     particles = Array{ThreeDVortexParticle, 1}(num_particles)
-    zero_vect3d = ThreeDVector(0., 0., 0.)
 
     # Angular definition
     dtheta = 2 * pi / num_particles
@@ -61,13 +57,12 @@ function vortex_particle_ring(
             centre + from_centre, # coord
             particle_strength * unit(cross(from_centre, n)), # vorticity
             particle_size, # size
-            zero_vect3d, # velocity
-            zero_vect3d # dvortdt
+            kernel
             )
         particles[i] = p
     end
-
-    return particles
+    particle_collector = ThreeDVorticitySimpleCollector(particles)
+    return particle_collector
 end
 
 """Generates a sheet of vortex particles

@@ -23,6 +23,9 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
+include("ThreeDVector.jl")
+include("ThreeDVorticity.jl")
+
 type ThreeDVortexRing <: ThreeDVorticity
     c1 :: ThreeDVector
     c2 :: ThreeDVector
@@ -58,7 +61,9 @@ function ThreeDVortexRing()
     return ThreeDVortexRing(c1, c2, c3, c4, 0.0)
 end
 
-function convert(::Vector{ThreeDStraightVortexFilament}, a::ThreeDVortexRing)
+function convert(
+    ::Type{Vector{ThreeDStraightVortexFilament}},
+    a::ThreeDVortexRing)
     b = Vector{ThreeDStraightVortexFilament}(4)
     b[1] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
     b[2] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
@@ -104,7 +109,7 @@ function induced_velocity_curl(
         [0. 0. 0.; 0. 0. 0.; 0. 0. 0.], +, fils)
 end
 
-function euler!(a::ThreeDVortexRing, b::ThreeDVorticityBody, dt::Real)
+function euler!(a::ThreeDVortexRing, b::ThreeDVorticity, dt::Real)
     v1 = induced_velocity(b, a.c1)
     v2 = induced_velocity(b, a.c2)
     v3 = induced_velocity(b, a.c3)

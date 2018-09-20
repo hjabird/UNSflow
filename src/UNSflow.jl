@@ -134,10 +134,17 @@ include("lowOrder2D/solvers.jl")             # solver methods
 include("lowOrder2D/postprocess.jl")         # postprocessing functions
 
 # low-order 3D solvers
-include("lowOrder3D/typedefs.jl")            # type definitions
-include("lowOrder3D/calcs.jl")               # calculation functions
-include("lowOrder3D/solvers.jl")             # solver methods
-include("lowOrder3D/postprocess.jl")         # postprocessing functions
+# include("lowOrder3D/typedefs.jl")            # type definitions
+# include("lowOrder3D/calcs.jl")               # calculation functions
+# include("lowOrder3D/solvers.jl")             # solver methods
+# include("lowOrder3D/postprocess.jl")         # postprocessing functions
+include("lowOrder3D/ThreeDVector.jl")
+include("lowOrder3D/ThreeDVorticity.jl")
+include("lowOrder3D/ThreeDVorticityCollector.jl")
+include("lowOrder3D/ThreeDVorticitySimpleCollector.jl")
+include("lowOrder3D/ThreeDStraightVortexFilament.jl")
+include("lowOrder3D/ThreeDVortexRing.jl")
+include("lowOrder3D/ThreeDVortexParticle.jl")
 
 # 2D plotting functions
 include("plots/plots2D.jl")

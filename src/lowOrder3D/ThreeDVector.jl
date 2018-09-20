@@ -1,8 +1,33 @@
 #===============================================================================
-    ThreeDVector
+    ThreeDVector.jl
+
+    Representation of a three dimensional vector.
+
+    Why?:   Julia does not implement statically sized vectors by default. Odd.
 
     Initial code: HJAB 2018
+
+    Copyright (c) 2018 HJA Bird
+
+    Permission is hereby granted, free of charge, to any person obtaining a copy
+    of this software and associated documentation files (the "Software"), to
+    deal in the Software without restriction, including without limitation the
+    rights to use, copy, modify, merge, publish, distribute, sublicense, and/or
+    sell copies of the Software, and to permit persons to whom the Software is
+    furnished to do so, subject to the following conditions:
+
+    The above copyright notice and this permission notice shall be included in
+    all copies or substantial portions of the Software.
+
+    THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+    IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+    FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+    AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+    LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING
+    FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
+    IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
+
 type ThreeDVector
     x :: Float64
     y :: Float64
@@ -64,8 +89,8 @@ function Base.:*(a::T, b::ThreeDVector) where T <: Real
     return b * a
 end
 
-function Base.:*(a::Matrix{Real}, b::ThreeDVector)
-    @assert(size(matrix) == (3,3))
+function Base.:*(a::Array{T, 2}, b::ThreeDVector) where {T <: Real}
+    @assert(size(a) == (3,3))
     c = ThreeDVector([
         dot(a[1,:], b),
         dot(a[2,:], b),
@@ -82,7 +107,6 @@ function Base.:/(a::ThreeDVector, b::T) where T <: Real
     return c
 end
 
-"""Cross product of two ThreeDVectors"""
 function cross(a::ThreeDVector, b::ThreeDVector)
     c = ThreeDVector(
         [a.y * b.z - a.z * b.y,
@@ -91,13 +115,12 @@ function cross(a::ThreeDVector, b::ThreeDVector)
     return c
 end
 
-"""Dot product of two ThreeDVectors"""
 function dot(a::ThreeDVector, b::ThreeDVector)
     return a.x * b.x + a.y * b.y + a.z * b.z
 end
 
 
-function dot(a::Vector{Real}, b::ThreeDVector)
+function dot(a::Array{T, 1}, b::ThreeDVector) where T <: Real
     @assert(length(a) == 3)
     return a[1] * b.x + a[2] * b.y + a[3] * b.z
 end
@@ -110,7 +133,6 @@ function Base.abs(a::ThreeDVector)
     return sqrt(a.x^2 + a.y^2 + a.z^2)
 end
 
-""" Set vector a to zero"""
 function zero!(a::ThreeDVector)
     a.x = 0.0
     a.y = 0.0
@@ -118,19 +140,25 @@ function zero!(a::ThreeDVector)
     return Void
 end
 
-"""Return vector of length 1 with same direction"""
 function unit(a::ThreeDVector)
     b = abs(a)
     return a / b
 end
 
-"""Set a vector normalised to length 1 with same direction"""
 function unit!(a::ThreeDVector)
     b = abs(a)
     a.x /= b
     a.y /= b
     a.z /= b
     return Void
+end
+
+function Base.:(==)(a::ThreeDVector, b::ThreeDVector)
+    if a.x == b.x && a.y == b.y && a.z == b.z
+        return true
+    else
+        return false
+    end
 end
 
 function iszero(a::ThreeDVector)
@@ -151,6 +179,14 @@ end
 
 function Base.size(a::ThreeDVector)
     return [3]
+end
+
+function outer(a::ThreeDVector, b::ThreeDVector)
+    return [
+        a.x*b.x a.x*b.y a.x*b.z;
+        a.y*b.x a.y*b.y a.y*b.z;
+        a.z*b.x a.z*b.y a.z*b.z;
+        ]
 end
 
 function Base.isfinite(a::ThreeDVector)

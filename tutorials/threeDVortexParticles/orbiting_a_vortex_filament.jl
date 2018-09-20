@@ -9,26 +9,16 @@ h.bird.1@research.gla.ac.uk
 
 
 #=--------------------------- Dependencies -----------------------------------=#
-# Plotting in Julia on my PC is broken, so I have to load dependencies like
-# this. If yours works, try import UNSflow.
-using Dierckx
-using SpecialFunctions
-import Base.size
-include("../../src/kinem.jl")
-include("../../src/utils.jl")
-include("../../src/delVort.jl")
-include("../../src/lowOrder2D/typedefs.jl")
-include("../../src/lowOrder2D/calcs.jl")
-include("../../src/lowOrder3D/typedefs.jl")
-include("../../src/lowOrder3D/calcs.jl")
+include("../../src/lowOrder3D/ThreeDVorticitySimpleCollector.jl")
+include("../../src/lowOrder3D/ThreeDVortexParticle.jl")
+include("../../src/lowOrder3D/ThreeDStraightVortexFilament.jl")
+include("ThreeDVortexParticleFlowFeatures.jl")
 using WriteVTK  # We'll use this package to output to VTK for visualisation.
 
 #-------------------------- User (that's you) parameters ---------------------=#
 # ODE integration parameters
 const num_steps = 2000
 const dt = 0.01
-# Options: euler_forward_step!, explicit_midpoint_step!
-ode_method = explicit_midpoint_step!
 # Data saving parameters
 basepath = "./output/orbiting_a_filament_"   # Where to write our output files
 const save_every = 10                       # Save every 10 steps.
@@ -41,36 +31,20 @@ filament = ThreeDStraightVortexFilament(
 particle1 = ThreeDVortexParticle(
     ThreeDVector(0.5, 0.5, 0.),  # Coordinates
     ThreeDVector(0., 0., 0.3),   # Vorticity
-    0.1,                        # Radius
-    # These don't matter, but have to be filled in anyway.
-    ThreeDVector(-1., 0., 0.),  # Velocity
-    ThreeDVector(0., 0., 1.)    # Rate of change of vorticity
+    0.1                        # Radius
 )
 
 particle2 = deepcopy(particle1)
 # We can also assign to our second particle.
 particle2.coord = convert(ThreeDVector, [0.5, 0., 0.5])
 particle2.vorticity = convert(ThreeDVector, [0., 0.3, 0.0])
-particle2.size = 0.1
-
-# options: singular, planetary, exponential, winckelmans, tanh, gaussian,
-# and super_gaussian
-reduction_factor_fn, vorticity_fraction_fn = threed_super_gaussian_kernels()
+particle2.radius = 0.1
 
 #=-------------------------- ODE time integration ----------------------------=#
-particle_set = ThreeDVortexParticleSet(
-    [particle1, particle2],
-    reduction_factor_fn,
-    vorticity_fraction_fn
-)
-function fil_ind_vel(particle :: ThreeDVortexParticle)
-    return ind_vel(filament, particle.coord)
-end
-function fil_ind_dvortdt(particle :: ThreeDVortexParticle)
-    return ind_dvortdt(particle, filament)
-end
+particles = ThreeDVorticitySimpleCollector(particle1, particle2)
+all_bodies = ThreeDVorticitySimpleCollector(filament, particles)
 
-num_particles = size(particle_set.particles)[1]
+num_particles = length(particles)
 for i = 1 : num_steps
     # Save the current state to vtk if required
     if (i - 1) % save_every == 0
@@ -79,13 +53,13 @@ for i = 1 : num_steps
         cells = Array{MeshCell, 1}(num_particles + 1)
         for j = 1 : num_particles
             points[:,j] =
-            [   particle_set.particles[j].coord.x,
-                particle_set.particles[j].coord.y,
-                particle_set.particles[j].coord.z    ]
+            [   particles.children[j].coord.x,
+                particles.children[j].coord.y,
+                particles.children[j].coord.z    ]
             point_vorticity[:, j] =
-            [   particle_set.particles[j].vorticity.x,
-                particle_set.particles[j].vorticity.y,
-                particle_set.particles[j].vorticity.z    ]
+            [   particles.children[j].vorticity.x,
+                particles.children[j].vorticity.y,
+                particles.children[j].vorticity.z    ]
             cells[j] = MeshCell(VTKCellTypes.VTK_VERTEX, [j])
         end
         points[:, num_particles + 1] = convert(Array{Float64,1}, filament.start_coord)
@@ -101,8 +75,9 @@ for i = 1 : num_steps
         outfiles = vtk_save(vtkfile)
     end
 
-    # Calculate the next iteration
-    particles = ode_method(particle_set, fil_ind_vel, fil_ind_dvortdt, dt)
+    # Calculate the next iteration.
+    # We are convecting particles due to the effects of all bodies.
+    euler!(particles, all_bodies, dt)
 end
 
 #=------------------- Now repeat until it doesn't blow up --------------------=#

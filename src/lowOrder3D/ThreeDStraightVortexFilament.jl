@@ -62,6 +62,7 @@ end
 
 function vorticity(filament::ThreeDStraightVortexFilament)
     return filament.vorticity * (filament.end_coord - filament.start_coord)
+end
 
 function induced_velocity(
     filament :: ThreeDStraightVortexFilament,
@@ -89,8 +90,8 @@ function induced_velocity_curl(
     )
 
     r0 = filament.end_coord - filament.start_coord
-    r1 = filament.coord - filament.start_coord
-    r2 = filament.coord - filament.end_coord
+    r1 = measurement_point - filament.start_coord
+    r2 = measurement_point - filament.end_coord
     # Notes, HJAB, Book 4, pg.42-pg.43 for derivation of the general theme
     # and pg70 for conversion to matrix expression.
     term1 = filament.vorticity / ( 4 * pi)
@@ -100,8 +101,8 @@ function induced_velocity_curl(
     term221 = 3.0 / abs(r0)
     term2221 = abs(cross(r0, r1)) / abs(r1)
     term2222 = -abs(cross(r0, r2)) / abs(r2)
-    term = term211 * (term2121 + term2122) +
-        term221 * (term2221 + term2222)
+    #term = term211 * (term2121 + term2122) +
+    #    term221 * (term2221 + term2222)
     A = term211 * (term2121 + term2122)
     B = term221 * (term2221 + term2222)
     C = term1 * [B -A.z A.y; A.z B -A.x; -A.y A.x B]
@@ -110,7 +111,7 @@ end
 
 function euler!(
     a::ThreeDStraightVortexFilament,
-    b::ThreeDVorticityBody,
+    b::ThreeDVorticity,
     dt::Real)
 
     vels = induced_velocity(b, a.start_coord)
