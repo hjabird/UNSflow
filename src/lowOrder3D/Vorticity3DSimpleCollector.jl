@@ -1,7 +1,7 @@
 #===============================================================================
-    ThreeDVorticitySimpleCollector.jl
+    Vorticity3DSimpleCollector.jl
 
-    A container for ThreeDVorticityBody(ies). As simple a container as is
+    A container for Vorticity3D(ies). As simple a container as is
     possible.
 
     Initial code: HJAB 2018
@@ -26,23 +26,23 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("ThreeDVorticityCollector.jl")
+include("Vorticity3DCollector.jl")
 
-# All methods are inherited from the ThreeDVorticityCollector supertype.
+# All methods are inherited from the Vorticity3DCollector supertype.
 
-type ThreeDVorticitySimpleCollector <: ThreeDVorticityCollector
-    children :: Vector{ThreeDVorticity}
+mutable struct Vorticity3DSimpleCollector <: Vorticity3DCollector
+    children :: Vector{Vorticity3D}
 
-    function ThreeDVorticitySimpleCollector()
-        new(Vector{ThreeDVorticity}())
+    function Vorticity3DSimpleCollector()
+        new(Vector{Vorticity3D}())
     end
-    function ThreeDVorticitySimpleCollector(child::ThreeDVorticityCollector)
+    function Vorticity3DSimpleCollector(child::Vorticity3DCollector)
         new(child)
     end
-    function ThreeDVorticitySimpleCollector(children...)
-        a = ThreeDVorticitySimpleCollector()
+    function Vorticity3DSimpleCollector(children...)
+        a = Vorticity3DSimpleCollector()
         for child in children
-            if typeof(child) <: ThreeDVorticity
+            if typeof(child) <: Vorticity3D
                 push!(a.children, child)
             else
                 try
@@ -50,15 +50,15 @@ type ThreeDVorticitySimpleCollector <: ThreeDVorticityCollector
                         push!(a.children, childchild)
                     end
                 catch
-                    error("Children must be ThreeDVorticity objects or
-                        iterable containers of ThreeDVorticity objects.")
+                    error("Children must be Vorticity3D objects or
+                        iterable containers of Vorticity3D objects.")
                 end
             end
         end
         return a
     end
-    function ThreeDVorticitySimpleCollector(children_iterable)
-        c = Vector{ThreeDVorticity}()
+    function Vorticity3DSimpleCollector(children_iterable)
+        c = Vector{Vorticity3D}()
         for child in children_iterable
             push!(c, child)
         end
@@ -66,4 +66,4 @@ type ThreeDVorticitySimpleCollector <: ThreeDVorticityCollector
     end
 end
 
-#= END ThreeDVorticitySimpleCollector -------------------------------------=#
+#= END Vorticity3DSimpleCollector --------------------------------------------=#

@@ -1,5 +1,5 @@
 #===============================================================================
-    ThreeDStraightVortexFilament.jl
+    StraightVortexFilament.jl
 
     Representation of a straight singular vortex filament.
 
@@ -25,54 +25,54 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-type ThreeDStraightVortexFilament <: ThreeDVorticity
-    start_coord :: ThreeDVector
-    end_coord :: ThreeDVector
+mutable struct StraightVortexFilament <: Vorticity3D
+    start_coord :: Vector3D
+    end_coord :: Vector3D
     vorticity :: Float64
 
-    function ThreeDStraightVortexFilament(
-        start_coord :: ThreeDVector,
-        end_coord :: ThreeDVector,
+    function StraightVortexFilament(
+        start_coord :: Vector3D,
+        end_coord :: Vector3D,
         vorticity :: T
         ) where T <: Real
         new(start_coord, end_coord, Float64(vorticity))
     end
 end
 
-function ThreeDStraightVortexFilament(
-    start_coord :: ThreeDVector,
-    end_coord :: ThreeDVector
+function StraightVortexFilament(
+    start_coord :: Vector3D,
+    end_coord :: Vector3D
     )
-    return ThreeDStraightVortexFilament(start_coord, end_coord, 0.0)
+    return StraightVortexFilament(start_coord, end_coord, 0.0)
 end
 
-ThreeDStraightVortexFilament() =
-    ThreeDStraightVortexFilament(
-        ThreeDVector([0., 0., 0.]),
-        ThreeDVector([1., 1., 1.]),
+StraightVortexFilament() =
+    StraightVortexFilament(
+        Vector3D([0., 0., 0.]),
+        Vector3D([1., 1., 1.]),
         0.0)
 
-function centre(filament::ThreeDStraightVortexFilament)
+function centre(filament::StraightVortexFilament)
     return (filament.start_coord + filament.end_coord) / 2
 end
 
-function effective_radius(filament::ThreeDStraightVortexFilament)
+function effective_radius(filament::StraightVortexFilament)
     return (filament.start_coord - filament.end_coord) / 2
 end
 
-function vorticity(filament::ThreeDStraightVortexFilament)
+function vorticity(filament::StraightVortexFilament)
     return filament.vorticity * (filament.end_coord - filament.start_coord)
 end
 
 function induced_velocity(
-    filament :: ThreeDStraightVortexFilament,
-    measurement_loc :: ThreeDVector
+    filament :: StraightVortexFilament,
+    measurement_loc :: Vector3D
     )
     r0 = filament.end_coord - filament.start_coord
     r1 = measurement_loc - filament.start_coord
     r2 = measurement_loc - filament.end_coord
     if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
-        return ThreeDVector(0,0,0)
+        return Vector3D(0,0,0)
     end
     # From Katz & Plotkin, Eq(2.72), pg41
     term1 = filament.vorticity / (4 * pi)
@@ -80,13 +80,13 @@ function induced_velocity(
     term2d = abs(cross(r1, r2)) ^ 2
     term3 = dot(r0, unit(r1) - unit(r2))
     vel =  term1 * (term2n / term2d) * term3
-    vel = (!isfinite(vel) ? ThreeDVector(0,0,0) : vel)
+    vel = (!isfinite(vel) ? Vector3D(0,0,0) : vel)
     return vel
 end
 
 function induced_velocity_curl(
-    filament :: ThreeDStraightVortexFilament,
-    measurement_point :: ThreeDVector
+    filament :: StraightVortexFilament,
+    measurement_point :: Vector3D
     )
 
     r0 = filament.end_coord - filament.start_coord
@@ -110,8 +110,8 @@ function induced_velocity_curl(
 end
 
 function euler!(
-    a::ThreeDStraightVortexFilament,
-    b::ThreeDVorticity,
+    a::StraightVortexFilament,
+    b::Vorticity3D,
     dt::Real)
 
     vels = induced_velocity(b, a.start_coord)
@@ -121,4 +121,4 @@ function euler!(
     return
 end
 
-#= END ThreeDStraightVortexFilament ------------------------------------------=#
+#= END StraightVortexFilament ------------------------------------------=#

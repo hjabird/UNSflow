@@ -1,5 +1,5 @@
 #===============================================================================
-    ThreeDVortexRegularisationFunctions.jl
+    Vortex3DRegularisationFunctions.jl
 
     These functions regularise the traditionally singular vortex to make it
     numerically (and physically) nicer.
@@ -41,7 +41,7 @@
 ------------------------------------------------------------------------------=#
 import(SpecialFunctions)
 
-type ThreeDVortexRegularisationFunctions
+struct Vortex3DRegularisationFunctions
     g :: Function
     G :: Function
     zeta :: Function
@@ -78,7 +78,7 @@ function threed_particle_singularity_kernels()
     function radius_modifier()
         return 1.0
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_singularity,
         vortex_G_singularity,
         vortex_zeta_singularity,
@@ -100,7 +100,7 @@ function threed_planetary_kernels()
     function radius_modifier()
         return 1.0
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_planetary,
         vortex_G_planetary,
         vortex_zeta_planetary,
@@ -122,7 +122,7 @@ function threed_exponential_kernels()
     function radius_modifier()
         error("Not yet implemented. Please consider contributing this.")
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_exponential,
         vortex_G_exponential,
         vortex_zeta_exponential,
@@ -137,7 +137,7 @@ function threed_winckelmans_kernels()
         b = rho^3
         c = rho^2 + 1
         d = a * b
-        e = c ^(5./2.)
+        e = c ^(5. / 2.)
         return d / e
     end
     function vortex_G_winckelmans(rho::Real)
@@ -146,12 +146,12 @@ function threed_winckelmans_kernels()
     function vortex_zeta_winckelmans(rho::Real)
         a = 15. / 2.
         b = rho ^ 2 + 1
-        return a / (b ^ (7./2.))
+        return a / (b ^ (7. / 2.))
     end
     function radius_modifier()
         error("Not yet implemented. Please consider contributing this.")
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_winckelmans,
         vortex_G_winckelmans,
         vortex_zeta_winckelmans,
@@ -173,7 +173,7 @@ function threed_tanh_kernels()
     function radius_modifier()
         error("Not yet implemented. Please consider contributing this.")
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_tanh,
         vortex_G_tanh,
         vortex_zeta_tanh,
@@ -184,7 +184,8 @@ end
 
 function threed_gaussian_kernels()
     function vortex_g_gaussian(rho::Float64)
-        return erf(rho / sqrt(2.)) - rho * vortex_zeta_gaussian(rho)
+        return SpecialFunctions.erf(rho / sqrt(2.)) -
+            rho * vortex_zeta_gaussian(rho)
     end
     function vortex_G_gaussian(rho::Real)
         return 0.5 * (log(rho^2/2) + SpecialFunctions.erf(rho^2/2))
@@ -195,7 +196,7 @@ function threed_gaussian_kernels()
     function radius_modifier()
         error("Not yet implemented. Please consider contributing this.")
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_gaussian,
         vortex_G_gaussian,
         vortex_zeta_gaussian,
@@ -219,11 +220,11 @@ function threed_super_gaussian_kernels()
     function radius_modifier()
         error("Not yet implemented. Please consider contributing this.")
     end
-    return ThreeDVortexRegularisationFunctions(
+    return Vortex3DRegularisationFunctions(
         vortex_g_super_gaussian,
         vortex_G_super_gaussian,
         vortex_zeta_super_gaussian,
         radius_modifier
     )
 end
-# END ThreeDVortexRegularisationFunctions =====================================#
+# END Vortex3DRegularisationFunctions =========================================#

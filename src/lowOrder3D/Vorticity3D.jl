@@ -1,5 +1,5 @@
 #===============================================================================
-    ThreeDVorticity.jl
+    Vorticity3D.jl
 
     Represents some kind of vorticity within the flow domain. Does not define
     goemetry or any other such thing. May be subtyped by groups of vortex
@@ -28,35 +28,35 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-abstract type ThreeDVorticity
+abstract type Vorticity3D
 end
 
-#= Expected interface for ThreeDVorticity:
+#= Expected interface for Vorticity3D:
 
 Constructor is defined by the concrete type.
 
-centre(this::ThreeDVorticity)
+centre(this::Vorticity3D)
     returns something somehow representative of the bodies' centre location
-    as a ThreeDVector. Whether this is geometrically central, or vorticity
+    as a Vector3D. Whether this is geometrically central, or vorticity
     weighted does not matter so long as it is considered by the programmer along
     with the effective_radius definition.
 
-effective_radius(this::ThreeDVorticity)
+effective_radius(this::Vorticity3D)
     returns a Real representative of the effective radius from the centre
     of a sphere that contains the 3D vorticity body's vorticy.
 
-vorticity(this::ThreeDVorticity)
-    returns the integral of vorticity within the body as ThreeDVector.
+vorticity(this::Vorticity3D)
+    returns the integral of vorticity within the body as Vector3D.
 
-induced_velocity(this::ThreeDVorticity, measurement_point::ThreeDVector)
+induced_velocity(this::Vorticity3D, measurement_point::Vector3D)
     returns the velocity induced by the body at measurement_point as a
-    ThreeDVector.
+    Vector3D.
 
-induced_velocity_curl(this::ThreeDVorticity, measurement_point::ThreeDVector)
+induced_velocity_curl(this::Vorticity3D, measurement_point::Vector3D)
     returns the curl in the velocity induced by the body at measurement_point as
     a 3 by 3 matrix, by which vorticity at that point can be multiplied.
 
-euler!(this::ThreeDVorticity, influence_field::ThreeDVorticity, dt::Real)
+euler!(this::Vorticity3D, influence_field::Vorticity3D, dt::Real)
     Applies convection to this body due to velocities induced by
     influence_field. Uses the forward Euler method.
 =#

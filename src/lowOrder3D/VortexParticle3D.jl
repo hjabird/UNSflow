@@ -1,5 +1,5 @@
 #===============================================================================
-    ThreeDVortexParticle.jl
+    VortexParticle3D.jl
 
     Representation of a vortex particle.
 
@@ -25,20 +25,20 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("ThreeDVector.jl")
-include("ThreeDVortexRegularisationFunctions.jl")
-include("ThreeDVorticity.jl")
+include("Vector3D.jl")
+include("Vortex3DRegularisationFunctions.jl")
+include("Vorticity3D.jl")
 
-type ThreeDVortexParticle <: ThreeDVorticity
-    coord :: ThreeDVector
-    vorticity :: ThreeDVector
+mutable struct VortexParticle3D <: Vorticity3D
+    coord :: Vector3D
+    vorticity :: Vector3D
     radius :: Float64
 
-    kernel_funcs :: ThreeDVortexRegularisationFunctions
+    kernel_funcs :: Vortex3DRegularisationFunctions
 
-    function ThreeDVortexParticle(
-        coordinate::ThreeDVector,
-        vorticity_vector::ThreeDVector,
+    function VortexParticle3D(
+        coordinate::Vector3D,
+        vorticity_vector::Vector3D,
         particle_radius::Real,
         kernel_functions=threed_winckelmans_kernels()
         )
@@ -47,25 +47,25 @@ type ThreeDVortexParticle <: ThreeDVorticity
     end
 end
 
-function centre(a::ThreeDVortexParticle)
+function centre(a::VortexParticle3D)
     return coord
 end
 
-function effective_radius(a::ThreeDVortexParticle)
+function effective_radius(a::VortexParticle3D)
     return a.radius * a.kernel_funcs.radius_modifier()
 end
 
-function vorticity(a::ThreeDVortexParticle)
+function vorticity(a::VortexParticle3D)
     return a.vorticity
 end
 
 function induced_velocity(
-    particle::ThreeDVortexParticle,
-    measurement_point::ThreeDVector)
+    particle::VortexParticle3D,
+    measurement_point::Vector3D)
     # Acceleration method & avoid singularities which most people are probably
     # evaluating accidently anyway.
     if iszero(particle.vorticity) || particle.coord == measurement_point
-        return ThreeDVector(0, 0, 0)
+        return Vector3D(0, 0, 0)
     end
     rad = particle.coord - measurement_point
     a = particle.kernel_funcs.g(abs(rad)/particle.radius) / (4. * pi)
@@ -76,8 +76,8 @@ function induced_velocity(
 end
 
 function induced_velocity_curl(
-    particle::ThreeDVortexParticle,
-    measurement_point::ThreeDVector)
+    particle::VortexParticle3D,
+    measurement_point::Vector3D)
 
     # This is taken from Robertson and Joo, 2010 "Vortex Particle Aerodynamic
     # Modelling of Perching Manoeuvres with Micro Air Vehicles", and I've
@@ -113,7 +113,7 @@ function induced_velocity_curl(
     return A
 end
 
-function euler!(a::ThreeDVortexParticle, b::ThreeDVorticity, dt::Real)
+function euler!(a::VortexParticle3D, b::Vorticity3D, dt::Real)
     vel = induced_velocity(b, a.coord)
     dvort = induced_velocity_curl(b, a.coord) * a.vorticity
     a.coord += vel * dt
@@ -121,4 +121,4 @@ function euler!(a::ThreeDVortexParticle, b::ThreeDVorticity, dt::Real)
     return
 end
 
-#= END ThreeDVortexParticle --------------------------------------------------=#
+#= END VortexParticle3D --------------------------------------------------=#

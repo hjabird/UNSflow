@@ -1,8 +1,8 @@
 #===============================================================================
-    ThreeDVorticityCollector.jl
+    Vorticity3DCollector.jl
 
-    Represents a collection of ThreeDVorticity(ies) that may themselves be
-    ThreeDVorticityCollectors.
+    Represents a collection of Vorticity3D(ies) that may themselves be
+    Vorticity3DCollectors.
 
     Initial code: HJAB 2018
 
@@ -26,27 +26,27 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("ThreeDVorticity.jl")
-include("ThreeDVector.jl")
+include("Vorticity3D.jl")
+include("Vector3D.jl")
 
-abstract type ThreeDVorticityCollector <: ThreeDVorticity
+abstract type Vorticity3DCollector <: Vorticity3D
 end
 
 #=
 The interface:
 
-ThreeDVorticityCollector.children
+Vorticity3DCollector.children
     are an iterable of the children of the collector.
 
-child_vorticities(a::ThreeDVorticityCollector)
-    returns a vector of the vorticity of all the non-ThreeDVorticityCollector
-    ThreeDVorticity objects owned by this collector, and, recursively, its
+child_vorticities(a::Vorticity3DCollector)
+    returns a vector of the vorticity of all the non-Vorticity3DCollector
+    Vorticity3D objects owned by this collector, and, recursively, its
     children.
 =#
 
 function get_children(
-    a::ThreeDVorticityCollector,
-    typefilter=ThreeDVorticity)
+    a::Vorticity3DCollector,
+    typefilter=Vorticity3D)
 
     retv = Vector{typefilter}()
     for child in a
@@ -58,12 +58,12 @@ function get_children(
 end
 
 function get_children_recursive(
-    a::ThreeDVorticityCollector,
-    typefilter=ThreeDVorticity
+    a::Vorticity3DCollector,
+    typefilter=Vorticity3D
     )
     retv = Vector{typefilter}()
     for child in a
-        if typeof(child) <: ThreeDVorticityCollector
+        if typeof(child) <: Vorticity3DCollector
             rv = get_children_recursive(child, typefilter)
             vcat(revt, rv)
         elseif typeof(child) <: typefilter
@@ -73,14 +73,44 @@ function get_children_recursive(
     return retv
 end
 
+#= Defualt container interaction methods -------------------------------------=#
+function Base.push!(a::Vorticity3DCollector, to_be_added::Vorticity3D)
+    push!(a.children, to_be_added)
+end
+
+function Base.append!(
+    a::Vorticity3DCollector,
+    iterable_of_things_to_be_appended)
+
+    @assert(typeof(iterable_of_things_to_be_added) <: Vorticity3D,
+        "To add individual Vorticity3D objects you want to use " *
+        "push!(a::Vorticity3DCollector, b::Vorticity3D). To add the children " *
+        "of a Vorticity3DCollector (\"b\") to this Vorticity3DCollector try " *
+        "append!(a::Vorticity3DCollector, get_children(b)).")
+    append!(a.children, to_be_added)
+end
+
+function Base.pop!(a::Vorticity3DCollector)
+    return pop!(a.children)
+end
+
+function Base.isempty(a::Vorticity3DCollector)
+    return isempty(a.children)
+end
+
+function Base.empty!(a::Vorticity3DCollector)
+    empty!(a.children)
+end
+
+
 #= Default vorticity body methods --------------------------------------------=#
-function vorticity(a::ThreeDVorticityCollector)
+function vorticity(a::Vorticity3DCollector)
     return mapreduce(vorticity, 0.0, +, a.children)
 end
 
-function centre(a::ThreeDVorticityCollector)
+function centre(a::Vorticity3DCollector)
     vort = 0.0
-    center = ThreeDVector(0,0,0)    # American spelling has its uses.
+    center = Vector3D(0,0,0)    # American spelling has its uses.
     for child in a.children
         vort += vorticity(child)
         center += centre(child) * vorticity
@@ -89,7 +119,7 @@ function centre(a::ThreeDVorticityCollector)
     return center
 end
 
-function effective_radius(a::ThreeDVorticityCollector)
+function effective_radius(a::Vorticity3DCollector)
     n_children = length(a.children)
     radii = zeros(Float64, n_children)
     c = centre(a)
@@ -102,8 +132,8 @@ function effective_radius(a::ThreeDVorticityCollector)
 end
 
 function euler!(
-    a::ThreeDVorticityCollector,
-    b::ThreeDVorticity,
+    a::Vorticity3DCollector,
+    b::Vorticity3D,
     dt::Real)
     # So we can call the update methods of our children...
     cpy = deepcopy(a)
@@ -115,20 +145,22 @@ function euler!(
 end
 
 function induced_velocity(
-    a::ThreeDVorticityCollector,
-    measurement_point :: ThreeDVector
+    a::Vorticity3DCollector,
+    measurement_point :: Vector3D
     )
-    vel = @parallel (+) for child in a
+    vel = Vector3D(0,0,0)
+    for child in a
         vel += induced_velocity(child, measurement_point)
     end
     return vel
 end
 
 function induced_velocity_curl(
-    a::ThreeDVorticityCollector,
-    measurement_point :: ThreeDVector
+    a::Vorticity3DCollector,
+    measurement_point :: Vector3D
     )
-    curly = @parallel (+) for child in a
+    curly = zeros(3,3)
+    for child in a
         curly += induced_velocity_curl(child, measurement_point)
     end
     return curly
@@ -136,37 +168,37 @@ end
 
 #= Default iterator ----------------------------------------------------------=#
 function Base.getindex(
-    a::ThreeDVorticityCollector,
+    a::Vorticity3DCollector,
     i::Integer)
     return a.children[i]
 end
 
 function Base.setindex!(
-    a::ThreeDVorticityCollector,
+    a::Vorticity3DCollector,
     i::Integer,
-    v::ThreeDVorticity)
+    v::Vorticity3D)
     a.children[i] = v
     return
 end
 
-function Base.length(a::ThreeDVorticityCollector)
+function Base.length(a::Vorticity3DCollector)
     return length(a.children)
 end
 
-function Base.size(a::ThreeDVorticityCollector)
+function Base.size(a::Vorticity3DCollector)
     return size(a.children)
 end
 
 if VERSION >= VersionNumber(0, 7, 0)    # Why not use Julia you ask?
-    function Base.firstindex(a::ThreeDVorticityCollector)
+    function Base.firstindex(a::Vorticity3DCollector)
         return 1
     end
 
-    function Base.lastindex(a::ThreeDVorticityCollector)
+    function Base.lastindex(a::Vorticity3DCollector)
         return length(a.children)
     end
 
-    function Base.iterate(a::ThreeDVorticityCollector, state=1)
+    function Base.iterate(a::Vorticity3DCollector, state=1)
         if state > length(a)
             return nothing
         else
@@ -174,15 +206,15 @@ if VERSION >= VersionNumber(0, 7, 0)    # Why not use Julia you ask?
         end
     end
 else # Version 0.6 or older.
-    function Base.start(a::ThreeDVorticityCollector)
+    function Base.start(a::Vorticity3DCollector)
         return 1
     end
 
-    function Base.next(a::ThreeDVorticityCollector, state::Integer)
+    function Base.next(a::Vorticity3DCollector, state::Integer)
         return (a[state], state+1)
     end
 
-    function Base.done(a::ThreeDVorticityCollector, state::Integer)
+    function Base.done(a::Vorticity3DCollector, state::Integer)
         return state > length(a)
     end
 end
