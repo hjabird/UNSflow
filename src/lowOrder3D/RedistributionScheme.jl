@@ -35,7 +35,7 @@ function zeroeth_order_redistribution_scheme(U::Real)
     end
 end
 
-function first_order_redistribution_scheme(U:Real)
+function first_order_redistribution_scheme(U::Real)
     if 0 <= U <= 1
         return 1 - U
     else
@@ -43,10 +43,10 @@ function first_order_redistribution_scheme(U:Real)
     end
 end
 
-function second_order_redistribution_scheme(U:Real)
+function second_order_redistribution_scheme(U::Real)
     if U < 0 || U >= 1.5
         return 0.
-    elif U < 0.5
+    elseif U < 0.5
         return 1 - U^2
     else
         return 0.5 * (1 - U) * (2 - U)
@@ -56,7 +56,7 @@ end
 function third_order_redistribution_scheme(U::Real)
     if U < 0 || U > 2
         return 0.
-    elif U <= 1
+    elseif U <= 1
         return 0.5 * (1 - U^2) * (2 - U)
     else
         return (1/6) * (1 - U) * (2 - U) * (3 - U)
@@ -66,7 +66,7 @@ end
 function m4_redistribution_scheme(U::Real)
     if U < 0 || U > 2
         return 0.
-    elif U <= 1
+    elseif U <= 1
         return 1 - (5/2)*U^2 + (3/2)*U^3
     else
         return 0.5 * (1 - U) * (2 - U)^2

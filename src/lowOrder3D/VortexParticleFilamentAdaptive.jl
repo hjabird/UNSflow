@@ -30,6 +30,7 @@ include("VortexParticle3D.jl")
 include("Vortex3DRegularisationFunctions.jl")
 include("RedistributionScheme.jl")
 import Dierckx
+import QuadGK
 
 mutable struct VortexParticleFilamentAdaptive <: Vorticity3DAdaptive
     children :: Vector{VortexParticle3D}
@@ -39,21 +40,31 @@ mutable struct VortexParticleFilamentAdaptive <: Vorticity3DAdaptive
     redistribution_scheme :: Function
 
     function VortexParticleFilamentAdaptive(
-        geometry_definition :: Function, # define geometry in [-1, 1]
+        geometry_definition::Function,
         strength :: Float64,
         gridsize :: Float64,
         new_particle_regularisation=threed_winckelmans_kernels(),
         redistribution_scheme=m4_redistribution_scheme)
 
-        @assert(hasmethod(geometry_definition, (Float64)),
+        @assert(hasmethod(geometry_definition, Tuple{Float64}),
             "geometry_definition must be a function that returns the ",
             "coordinate (as a Vector3D) of a point on the spline for ",
             "a Float64 argument in [-1, 1].")
         @assert(0 < gridsize, "gridsize must be positive.")
 
-        dx = x -> ForwardDiff.derivative(geometry_definition, x)
-
-
+        spline_x, spline_y, spline_z = three_d_function_to_splines(
+            geometry_definition, -1., 1., 0.02)
+        dx = x -> Vector3D(
+            Dierckx.derivative(spline_x, x),
+            Dierckx.derivative(spline_y, x),
+            Dierckx.derivative(spline_z, x))
+        new_x_locs = funcs_to_equal_spacing(dx, -1., 1., gridsize)
+        particles = Vector{VortexParticle3D}()
+        for i = 1 : length(new_x_locs)
+            p = VortexParticle3D(geometry_definition(new_x_locs[i]),
+                dx(new_x_locs[i]) * strength, gridsize * 1.3)
+            push!(particles, p)
+        end
         new(particles, gridsize,
             new_particle_regularisation, redistribution_scheme)
     end
@@ -74,19 +85,7 @@ function adaptive_update!(a::VortexParticleFilamentAdaptive)
     spline_length = integrate(spl, 1, length(a.children))
     # Now we can work on placing the new particles
     new_child_count = ceil(spline_length / a.gridsize)
-    new_x_locs = zeros(new_child_count)
-    new_x_locs[1] = 1
-    for i = 2:new_child_count - 1
-        # Newton-Raphson iteration...
-        err = 99999
-        x = i * (length(x_coords) / length(new_x_locs))
-        while err > 0.0001                                     # EVIL CONSTANT!
-            x -= (integrate(spl, 0, x) - (i - 1) *
-                (spline_length/new_child_count)) / spl(x)
-        end
-        new_x_locs[i] = x
-    end
-    new_x_locs[end] = length(a.children)
+    new_x_locs = funcs_to_equal_spacing(dl, 1, length(a.children), a.gridsize)
     # Assign coordinates and size:
     new_children = Vector{VortexParticle3D}()
     for i = 1 : new_child_count
@@ -110,11 +109,11 @@ end
 #- Reimplentation of collection interaction functions ------------------------=#
 
 # We can only push! VortexParticle3Ds.
-function push!(a::VortexParticleFilamentAdaptive, b::VortexParticle3D)
+function Base.push!(a::VortexParticleFilamentAdaptive, b::VortexParticle3D)
     push!(a.children, b)
 end
 
-function append!(a::VortexParticleFilamentAdaptive, b)
+function Base.append!(a::VortexParticleFilamentAdaptive, b)
     @assert(eltype(b) <: VortexParticle3D, "Only VortexParticle3D can be
         added to the VortexParticleFilamentAdaptive.")
     append!(a.children, b)
@@ -135,27 +134,39 @@ end
 #= END VortexFilamentAdaptive ------------------------------------------------=#
 
 function funcs_to_equal_spacing(
-    coord_fn :: Function,
     coord_deriv_fn :: Function,
     min_arg :: Real,
     max_arg :: Real,
     spacing :: Real
     )
-
-    spline_length = integrate(spl, 1, length(a.children))
+    dlength = x::Float64 -> abs(coord_deriv_fn(x))
+    spline_length, _ = QuadGK.quadgk(dlength, min_arg, max_arg)
     # Now we can work on placing the new particles
     new_child_count = ceil(spline_length / spacing)
-    new_x_locs = zeros(new_child_count)
+    new_x_locs = zeros(Int32(new_child_count))
     new_x_locs[1] = min_arg
     for i = 2:new_child_count - 1
         # Newton-Raphson iteration...
         err = 99999
-        x = i * (length(x_coords) / length(new_x_locs))
+        x = i * ((max_arg-min_arg) / length(new_x_locs)) - min_arg
         while err > 0.001 * spacing                             # EVIL CONSTANT!
-            x -= (integrate(spl, 0, x) - (i - 1) *
-                (spline_length/new_child_count)) / spl(x)
+            x -= (QuadGK.quadgk(dlength, min_arg, x)[1] - (i - 1) *
+                (spline_length/new_child_count)) / dlength(x)
         end
         new_x_locs[i] = x
     end
     new_x_locs[end] = max_arg
+end
+
+function three_d_function_to_splines(func::Function, min_arg::Real,
+        max_arg::Real, resolution :: Real)
+    is = Vector{Float64}(min_arg:resolution:max_arg)
+    vals = func.(is)
+    xs = map(x->x.x, vals)
+    ys = map(x->x.y, vals)
+    zs = map(x->x.z, vals)
+    spx = Dierckx.Spline1D(is, xs)
+    spy = Dierckx.Spline1D(is, ys)
+    spz = Dierckx.Spline1D(is, zs)
+    return spx, spy, spz
 end

@@ -12,9 +12,9 @@ h.bird.1@research.gla.ac.uk
 include("../../src/lowOrder3D/Vorticity3DSimpleCollector.jl")
 include("../../src/lowOrder3D/VortexParticle3D.jl")
 include("../../src/lowOrder3D/VortexParticleFilamentAdaptive.jl")
-include("ThreeDVortexParticleFlowFeatures.jl")
+include("VortexFlowFeatures.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
-
+import ForwardDiff
 #-------------------------- User (that's you) parameters ---------------------=#
 # ODE integration parameters
 const num_steps = 2000
@@ -26,21 +26,25 @@ const save_every = 10                     # Save every 10 steps
 const update_adaptivity_every = 10        # Update our representation every 10
 # Initial conditions
 filament1 = VortexParticleFilamentAdaptive(
-    [VortexParticle3D(Vector3D())]
-)
-filament2 =
+    x::Float64 -> Vector3D(0, 0, x), 1.0, 0.05)
+filament2 =VortexParticleFilamentAdaptive(
+    x::Float64 -> Vector3D(0.5 + 0.01 * sin(4 * pi * x), 0, x), -1.0, 0.05)
+collector = Vorticity3DSimpleCollector(filament1, filament2)
 
 #=-------------------------- ODE time integration ----------------------------=#
-particles = Vorticity3DSimpleCollector(particle1, particle2)
-all_bodies = Vorticity3DSimpleCollector(filament, particles)
-
 num_particles = length(particles)
 for i = 1 : num_steps
+    if (i - 1) % update_adaptivity_every == 0
+        map(x->adaptive_update!(x), get_children(collector, Vorticity3DAdaptive))
+    end
+
     # Save the current state to vtk if required
+    num_particles = length(particles)
     if (i - 1) % save_every == 0
         points = zeros(3, num_particles + 2)
         point_vorticity = zeros(3, num_particles + 2)
         cells = Vector{WriteVTK.MeshCell}(undef, num_particles + 1)
+        particles = get_children_recursive(collector)
         for j = 1 : num_particles
             points[:,j] =
             [   particles.children[j].coord.x,
