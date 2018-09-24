@@ -35,7 +35,7 @@ end
 # This should be reimplemented by each adaptive container to reflect its own
 # adaptive nature. If -oddly- you wanted to knowthing, this should be
 # reimplemented to do nothing.
-function adaptive_update(a::Vorticity3DAdaptive)
+function adaptive_update!(a::Vorticity3DAdaptive)
     error(string("The function adaptive_update(a::", typeof(a),
         ") has not been reimpleneted for that method as it should have!"))
 end

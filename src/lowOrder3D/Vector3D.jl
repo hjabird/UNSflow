@@ -27,6 +27,7 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
+import ForwardDiff
 
 mutable struct Vector3D
     x :: Float64
@@ -234,4 +235,50 @@ function rotate_about_axis(
     return convert(Vector3D, mtrw * convert(Vector{Float64}, point))
 end
 
+function grad(a::Function, location::Vector3D)
+    @assert(hasmethod(a, (Vector3D)))
+    fx = x::Real -> a(Vector3D(x, location.y, location.z))
+    fy = y::Real -> a(Vector3D(location.x, y, location.z))
+    fz = z::Real -> a(Vector3D(location.x, location.y, z))
+    dx = ForwardDiff.derivative(fx, location.x)
+    dy = ForwardDiff.derivative(fx, location.y)
+    dz = ForwardDiff.derivative(fx, location.z)
+    if dx <: Real
+        retv = Vector3D();
+        retv.x = dx
+        retv.y = dy
+        retv.z = dz
+        return retv
+    elif dx <: Vector3D
+        retv = zeros(3,3)
+        retv[:, 1] = dx
+        retv[:, 2] = dy
+        retv[:, 3] = dz
+        return retv
+    else
+        error("Given function returns niether a scalar nor vector. ",
+            "Given function was ", nameof(a), " from ",
+            functionloc(a), ".")
+    end
+end
+
+function curl(a::Function, location::Vector3D)
+    @assert(hasmethod(a, (Vector3D)))
+    fx = x::Real -> a(Vector3D(x, location.y, location.z))
+    fy = y::Real -> a(Vector3D(location.x, y, location.z))
+    fz = z::Real -> a(Vector3D(location.x, location.y, z))
+    dx = ForwardDiff.derivative(fx, location.x)
+    dy = ForwardDiff.derivative(fx, location.y)
+    dz = ForwardDiff.derivative(fx, location.z)
+    if dx <: Vector3D
+        retv = Vector3D()
+        retv.x = dy.z - dz.y
+        retv.y = dz.x - dx.z
+        retv.z = dx.y - dy.x
+    else
+        error("Given function returns niether a scalar nor vector. ",
+            "Given function was ", nameof(a), " from ",
+            functionloc(a), ".")
+    end
+end
 #= END Vector3D ----------------------------------------------------------=#
