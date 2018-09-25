@@ -65,7 +65,7 @@ function get_children_recursive(
     for child in a
         if typeof(child) <: Vorticity3DCollector
             rv = get_children_recursive(child, typefilter)
-            vcat(revt, rv)
+            retv = vcat(retv, rv)
         elseif typeof(child) <: typefilter
             push!(retv, child)
         end
