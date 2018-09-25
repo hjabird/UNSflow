@@ -25,12 +25,10 @@
 ------------------------------------------------------------------------------=#
 include("Vector3D.jl")
 include("Vorticity3D.jl")
+include("PolyLine2")
 
 type VortexRing <: Vorticity3D
-    c1 :: Vector3D
-    c2 :: Vector3D
-    c3 :: Vector3D
-    c4 :: Vector3D
+    geometry :: PolyLine2
     strength :: Float64
 
     function VortexRing(
@@ -40,7 +38,7 @@ type VortexRing <: Vorticity3D
         corner4 :: Vector3D,
         strength :: Float64
         )
-        return new(corner1, corner2, corner3, corne4, strength)
+        return new(PolyLine2([corner1, corner2, corner3, corner4]), strength)
     end
 end
 
@@ -65,24 +63,27 @@ function convert(
     ::Type{Vector{ThreeDStraightVortexFilament}},
     a::VortexRing)
     b = Vector{ThreeDStraightVortexFilament}(4)
-    b[1] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
-    b[2] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
-    b[3] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
-    b[4] = ThreeDStraightVortexFilament(a.c1, a.c2, a.strength)
+    coords = a.goemetry.coords
+    b[1] = ThreeDStraightVortexFilament(coords[1], coords[2], a.strength)
+    b[2] = ThreeDStraightVortexFilament(coords[2], coords[3], a.strength)
+    b[3] = ThreeDStraightVortexFilament(coords[3], coords[4], a.strength)
+    b[4] = ThreeDStraightVortexFilament(coords[4], coords[1], a.strength)
     return b
 end
 
 function centre(ring::VortexRing)
-    return (ring.c1 + ring.c2 + ring.c3 + ring.c4) / 4
+    coords = ring.goemetry.coords
+    return (coords[1] + coords[2] + coords[3] + coords[4]) / 4
 end
 
 function effective_radius(ring::VortexRing)
     c = centre(ring)
+    coords = ring.goemetry.coords
     return maximum([
-        abs(ring.c1 - c),
-        abs(ring.c2 - c),
-        abs(ring.c3 - c),
-        abs(ring.c4 - c),
+        abs(coords[1] - c),
+        abs(coords[2] - c),
+        abs(coords[3] - c),
+        abs(coords[4] - c),
     ])
 end
 

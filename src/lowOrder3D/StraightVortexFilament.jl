@@ -25,9 +25,10 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
+include("Line2.jl")
+
 mutable struct StraightVortexFilament <: Vorticity3D
-    start_coord :: Vector3D
-    end_coord :: Vector3D
+    geometry :: Line2
     vorticity :: Float64
 
     function StraightVortexFilament(
@@ -35,7 +36,7 @@ mutable struct StraightVortexFilament <: Vorticity3D
         end_coord :: Vector3D,
         vorticity :: T
         ) where T <: Real
-        new(start_coord, end_coord, Float64(vorticity))
+        new(Line2(start_coord, end_coord), Float64(vorticity))
     end
 end
 
@@ -43,7 +44,7 @@ function StraightVortexFilament(
     start_coord :: Vector3D,
     end_coord :: Vector3D
     )
-    return StraightVortexFilament(start_coord, end_coord, 0.0)
+    return StraightVortexFilament(Line2(start_coord, end_coord), 0.0)
 end
 
 StraightVortexFilament() =
@@ -53,24 +54,25 @@ StraightVortexFilament() =
         0.0)
 
 function centre(filament::StraightVortexFilament)
-    return (filament.start_coord + filament.end_coord) / 2
+    return (filament.geometry.start_coord + filament.geometry.end_coord) / 2
 end
 
 function effective_radius(filament::StraightVortexFilament)
-    return (filament.start_coord - filament.end_coord) / 2
+    return (filament.geometry.start_coord - filament.geometry.end_coord) / 2
 end
 
 function vorticity(filament::StraightVortexFilament)
-    return filament.vorticity * (filament.end_coord - filament.start_coord)
+    return filament.vorticity * (filament.geometry.end_coord
+        - filament.geometry.start_coord)
 end
 
 function induced_velocity(
     filament :: StraightVortexFilament,
     measurement_loc :: Vector3D
     )
-    r0 = filament.end_coord - filament.start_coord
-    r1 = measurement_loc - filament.start_coord
-    r2 = measurement_loc - filament.end_coord
+    r0 = filament.geometry.end_coord - filament.geometry.start_coord
+    r1 = measurement_loc - filament.geometry.start_coord
+    r2 = measurement_loc - filament.geometry.end_coord
     if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
         return Vector3D(0,0,0)
     end
@@ -89,9 +91,9 @@ function induced_velocity_curl(
     measurement_point :: Vector3D
     )
 
-    r0 = filament.end_coord - filament.start_coord
-    r1 = measurement_point - filament.start_coord
-    r2 = measurement_point - filament.end_coord
+    r0 = filament.geometry.end_coord - filament.geometry.start_coord
+    r1 = measurement_point - filament.geometry.start_coord
+    r2 = measurement_point - filament.geometry.end_coord
     # Notes, HJAB, Book 4, pg.42-pg.43 for derivation of the general theme
     # and pg70 for conversion to matrix expression.
     term1 = filament.vorticity / ( 4 * pi)
@@ -114,10 +116,10 @@ function euler!(
     b::Vorticity3D,
     dt::Real)
 
-    vels = induced_velocity(b, a.start_coord)
-    vele = induced_velocity(b, a.end_coord)
-    a.start_coord += vels * dt
-    a.end_coord += vele * dt
+    vels = induced_velocity(b, a.geometry.start_coord)
+    vele = induced_velocity(b, a.geometry.end_coord)
+    a.geometry.start_coord += vels * dt
+    a.geometry.end_coord += vele * dt
     return
 end
 

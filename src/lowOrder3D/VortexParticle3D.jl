@@ -26,11 +26,12 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 include("Vector3D.jl")
+include("Point3D.jl")
 include("Vortex3DRegularisationFunctions.jl")
 include("Vorticity3D.jl")
 
 mutable struct VortexParticle3D <: Vorticity3D
-    coord :: Vector3D
+    geometry :: Point3D
     vorticity :: Vector3D
     radius :: Float64
 
@@ -43,12 +44,13 @@ mutable struct VortexParticle3D <: Vorticity3D
         kernel_functions=threed_winckelmans_kernels()
         )
         @assert(particle_radius >= 0.0)
-        new(coordinate, vorticity_vector, particle_radius, kernel_functions)
+        new(Point3D(coordinate), vorticity_vector,
+            particle_radius, kernel_functions)
     end
 end
 
 function centre(a::VortexParticle3D)
-    return coord
+    return geometry.coord
 end
 
 function effective_radius(a::VortexParticle3D)
@@ -64,10 +66,10 @@ function induced_velocity(
     measurement_point::Vector3D)
     # Acceleration method & avoid singularities which most people are probably
     # evaluating accidently anyway.
-    if iszero(particle.vorticity) || particle.coord == measurement_point
+    if iszero(particle.vorticity) || particle.geometry.coord==measurement_point
         return Vector3D(0, 0, 0)
     end
-    rad = particle.coord - measurement_point
+    rad = particle.geometry.coord - measurement_point
     a = particle.kernel_funcs.g(abs(rad)/particle.radius) / (4. * pi)
     den = abs(rad)^3
     c = cross(rad, particle.vorticity)
@@ -84,11 +86,11 @@ function induced_velocity_curl(
     # factorised out the term for the affected particles vorticity, such that
     # it turns into a matrix multiplication dalpha/dt = A x alpha where
     # A is what we are generating here.
-    if iszero(particle.vorticity) || particle.coord == measurement_point
+    if iszero(particle.vorticity) || particle.geometry.coord==measurement_point
         return zeros(3,3)
     end
 
-    rad = particle.coord - measurement_point
+    rad = particle.geometry.coord - measurement_point
     rho = abs(rad)/particle.radius
     gf = particle.kernel_funcs.g(rho)
     zetaf = particle.kernel_funcs.zeta(rho)
@@ -114,11 +116,41 @@ function induced_velocity_curl(
 end
 
 function euler!(a::VortexParticle3D, b::Vorticity3D, dt::Real)
-    vel = induced_velocity(b, a.coord)
-    dvort = induced_velocity_curl(b, a.coord) * a.vorticity
-    a.coord += vel * dt
+    vel = induced_velocity(b, a.geometry.coord)
+    dvort = induced_velocity_curl(b, a.geometry.coord) * a.vorticity
+    a.geometry.coord += vel * dt
     a.vorticity += dvort * dt
     return
+end
+
+function state_vector(this::VortexParticle3D)
+    # Because of the way vortex particles work, we it has to be redefined
+    # there too
+    state_vect = Vector{Float64}(undef, 6)
+    state_vect[1:3] = convert(Vector{Float64}, this.goemetry.coord)
+    state_vect[4:6] = convert(Vector{Float64}, this.vorticity)
+    return state_vect
+end
+
+function update_using_state_vector(
+    this::VortexParticle3D,
+    state_vector::Vector{Float64})
+
+    state_vect[1:3] = convert(Vector{Float64}, this.goemetry.coord)
+    state_vect[4:6] = convert(Vector{Float64}, this.vorticity)
+    state_vect = state_vect[7:end]
+    return state_vect
+end
+
+function state_time_derivative(
+    this::VortexParticle3D,
+    inducing_bodies::Vorticity3D)
+    # We assume here that the change in due only due to convection of points.
+    # Otherwise we need to specially define this such as for VortexParticle3D
+    deriv_vect = Vector{Float64}(undef, 6)
+    deriv_vect[1:3] = induced_velocity(this, inducing_bodies)
+    deriv_vect[4:6] = nduced_velocity_curl(b, a.geometry.coord) * this.vorticity
+    return deriv_vect
 end
 
 #= END VortexParticle3D --------------------------------------------------=#

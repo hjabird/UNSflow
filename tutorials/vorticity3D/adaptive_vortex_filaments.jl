@@ -12,6 +12,7 @@ h.bird.1@research.gla.ac.uk
 include("../../src/lowOrder3D/Vorticity3DSimpleCollector.jl")
 include("../../src/lowOrder3D/VortexParticle3D.jl")
 include("../../src/lowOrder3D/VortexParticleFilamentAdaptive.jl")
+include("../../src/lowOrder3D/DiscreteGeometry3DToVTK.jl")
 include("VortexFlowFeatures.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
 import ForwardDiff
@@ -44,20 +45,16 @@ for i = 1 : num_steps
     # Save the current state to vtk if required
     num_particles = length(get_children_recursive(collector))
     if (i - 1) % save_every == 0
-        points = zeros(3, num_particles)
+        points = zeros(3, 0)
         point_vorticity = zeros(3, num_particles)
-        cells = Vector{WriteVTK.MeshCell}(undef, num_particles)
+        cells = Vector{WriteVTK.MeshCell}(undef, 0)
         particles = get_children_recursive(collector)
         for j = 1 : num_particles
-            points[:,j] =
-            [   particles[j].coord.x,
-                particles[j].coord.y,
-                particles[j].coord.z    ]
+            points, cells = add_to_VtkMesh(points, cells, particles[j].geometry)
             point_vorticity[:, j] =
             [   particles[j].vorticity.x,
                 particles[j].vorticity.y,
                 particles[j].vorticity.z    ]
-            cells[j] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_VERTEX, [j])
         end
         vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
         WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")

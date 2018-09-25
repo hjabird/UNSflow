@@ -55,8 +55,74 @@ induced_velocity(this::Vorticity3D, measurement_point::Vector3D)
 induced_velocity_curl(this::Vorticity3D, measurement_point::Vector3D)
     returns the curl in the velocity induced by the body at measurement_point as
     a 3 by 3 matrix, by which vorticity at that point can be multiplied.
-
-euler!(this::Vorticity3D, influence_field::Vorticity3D, dt::Real)
-    Applies convection to this body due to velocities induced by
-    influence_field. Uses the forward Euler method.
 =#
+
+# Applies convection to this body due to velocities induced by
+# influence_field. Uses the forward Euler method.
+function euler!(this::Vorticity3D, influence_field::Vorticity3D, dt::Real)
+    coords = coords(this.goemetry)
+    vel = Vector{Vector3D}(undef, length(coords))
+    for pair in zip(vel, coords)
+        pair[1] = map(x->induced_velocity(influence_field, x), pair[2])
+    end
+    coords += vel
+    return
+end
+
+function state_vector(a::Vorticity3D)
+    # We assume here that the change in due only due to convection of points.
+    # Otherwise we need to specially define this such as for VortexParticle3D
+    state_vect = Vector{Float64}()
+    if typeof(a) <: Vorticity3DCollector
+        for child in children(a)
+            append!(state_vect, state_vector(child))
+        end
+    else
+        coord_vect = coords(a.geometry)
+        for c in coord_vect
+            append!(state_vect, convert(Vector{Float64}, c))
+        end
+    end
+    return state_vect
+end
+
+function update_using_state_vector(
+    this::Vorticity3D,
+    state_vector::Vector{Float64})
+    # We assume here that the change in due only due to convection of points.
+    # Otherwise we need to specially define this such as for VortexParticle3D
+    if typeof(this) <: Vorticity3DCollector
+        for child in children(this)
+            state_vect = update_using_state_vector(child, state_vect)
+        end
+    else
+        coord_vect = coords(this.geometry)
+        for i = 1 : length(coord_vect)
+            coord_vect[i].x = state_vect[i * 3 - 2]
+            coord_vect[i].y = state_vect[i * 3 - 1]
+            coord_vect[i].z = state_vect[i * 3]
+        end
+        coord_vect = coord_vect[length(coord_vect) * 3 + 1: end]
+    end
+    return state_vect
+end
+
+function state_time_derivative(
+    this::Vorticity3D,
+    inducing_bodies::Vorticity3D)
+    # We assume here that the change in due only due to convection of points.
+    # Otherwise we need to specially define this such as for VortexParticle3D
+    deriv_vect = Vector{Float64}()
+    if typeof(this) <: Vorticity3DCollector
+        for child in children(this)
+            append!(state_vect, state_time_derivative(child, inducing_bodies))
+        end
+    else
+        coord_vect = coords(this.geometry)
+        for c in coord_vect
+            append!(state_vect,
+                convert(Vector{Float64}, induced_velocity(this, inducing_bodies)))
+        end
+    end
+    return deriv_vect
+end

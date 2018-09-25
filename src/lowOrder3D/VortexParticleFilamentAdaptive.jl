@@ -76,9 +76,9 @@ end
 function adaptive_update!(a::VortexParticleFilamentAdaptive)
     # For a spline for each dimension out of our vortex particles.
     spline_x = Vector{Float64}(1:length(a.children))
-    spx = Dierckx.Spline1D(spline_x, map(x->x.coord.x, a.children))
-    spy = Dierckx.Spline1D(spline_x, map(x->x.coord.y, a.children))
-    spz = Dierckx.Spline1D(spline_x, map(x->x.coord.z, a.children))
+    spx = Dierckx.Spline1D(spline_x, map(x->x.geometry.coord.x, a.children))
+    spy = Dierckx.Spline1D(spline_x, map(x->x.geometry.coord.y, a.children))
+    spz = Dierckx.Spline1D(spline_x, map(x->x.geometry.coord.z, a.children))
     # Functions for coord and derivative
     xp = x->Vector3D(spx(x), spy(x), spz(x))
     dl = x->Vector3D(Dierckx.derivative(spx, x), Dierckx.derivative(spy, x),
