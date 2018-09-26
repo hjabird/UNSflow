@@ -45,11 +45,11 @@ include("PolyLine2.jl")
             coord = vec3_points[i]
             new_points[:, i] = [coord.x, coord.y, coord.z]
         end
-        idx_offset = length(filepoints)
+        idx_offset = size(filepoints)[2]
         filepoints = hcat(filepoints, new_points)
         newcells = deepcopy(filecells)
         push!(newcells, WriteVTK.MeshCell(new_cell_type,
-            idx_offset + 1 : idx_offset + length(vec3_points)))
+            Vector{Int64}(idx_offset + 1 : idx_offset + length(vec3_points))))
         filecells = newcells
         return filepoints, filecells
     end

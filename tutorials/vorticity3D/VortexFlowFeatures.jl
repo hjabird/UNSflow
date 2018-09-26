@@ -80,18 +80,19 @@ function vortex_particle_sheet(
     vorticity_func::Function, # func(x,y) returns Vector3D
     bounds::Array{Float64}, # [minx, maxx, miny, maxy]
     num_x::Int64,
-    num_y::Int64
+    num_y::Int64,
+    kernel::Vortex3DRegularisationFunctions
     )
 
     @assert(num_x > 0)
     @assert(num_y > 0)
     @assert(bounds[1] < bounds[2])
     @assert(bounds[3] < bounds[4])
-
+    linspace = (b1, b2, n) -> Vector{Float64}(b1 : (b2-b1)/n : b2)
     xs = linspace(bounds[1], bounds[2], num_x)
     ys = linspace(bounds[3], bounds[4], num_y)
     num_particles = num_x * num_y
-    particles = Array{VortexParticle3D, 1}(num_particles)
+    particles = Array{VortexParticle3D, 1}(undef, num_particles)
 
     for i = 1:num_x
         for j = 1:num_y
@@ -103,9 +104,9 @@ function vortex_particle_sheet(
             vort = vorticity_func(xs[i], ys[j]) * patch_size
             vort_size = 1.3 * sqrt(patch_size) / 2
             particles[num_x * (j - 1) + i] = VortexParticle3D(
-                coord, vort, vort_size, z, z)
+                coord, vort, vort_size, kernel)
         end
     end
 
-    return particles
+    return Vorticity3DSimpleCollector(particles)
 end

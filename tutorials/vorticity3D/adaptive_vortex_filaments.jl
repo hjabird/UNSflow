@@ -38,8 +38,11 @@ for i = 1 : num_steps
     num_particles = length(get_children_recursive(collector))
     println("Step ", i, " with ", num_particles, " particles. ")
     if (i - 1) % update_adaptivity_every == 0
-        println("Updating adaptive!")
-        map(x->adaptive_update!(x),get_children(collector, Vorticity3DAdaptive))
+        for child in get_children(collector, Vorticity3DAdaptive)
+            println("precall")
+            adaptive_update!(child)
+            println("postcall")
+        end
     end
 
     # Save the current state to vtk if required

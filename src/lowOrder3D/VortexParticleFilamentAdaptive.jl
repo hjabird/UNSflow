@@ -75,6 +75,7 @@ end
 
 function adaptive_update!(a::VortexParticleFilamentAdaptive)
     # For a spline for each dimension out of our vortex particles.
+    println("In fn.")
     spline_x = Vector{Float64}(1:length(a.children))
     spx = Dierckx.Spline1D(spline_x, map(x->x.geometry.coord.x, a.children))
     spy = Dierckx.Spline1D(spline_x, map(x->x.geometry.coord.y, a.children))
@@ -84,10 +85,13 @@ function adaptive_update!(a::VortexParticleFilamentAdaptive)
     dl = x->Vector3D(Dierckx.derivative(spx, x), Dierckx.derivative(spy, x),
         Dierckx.derivative(spz, x))
     # Spline for calculating lengths
+    println("Point1")
     gradient_points = Vector{Float64}(1:0.25:length(a.children))
     spl = Dierckx.Spline1D(gradient_points, abs.(dl.(gradient_points)))
+    println("Point2")
     new_x_locs, spline_length =
                 funcs_to_equal_spacing(dl, 1, length(a.children), a.gridsize)
+    println("Point3")
     # Assign coordinates and size:
     new_children = Vector{VortexParticle3D}()
     for i = 1 : length(new_x_locs)
@@ -148,19 +152,29 @@ function funcs_to_equal_spacing(
     actual_spacing = spline_length / (new_child_count - 1)
     new_x_locs = zeros(Int32(new_child_count))
     new_x_locs[1] = min_arg
+    println("Spacing 2")
     for i = 2:new_child_count - 1
         # Newton-Raphson iteration...
         err = 99999
         x = i * ((max_arg-min_arg) / length(new_x_locs)) - min_arg
+        iter_count = 0
         while err > 0.001 * spacing                             # EVIL CONSTANT!
             x_minus1 = x
+            println("Prequad")
             x -= (QuadGK.quadgk(dlength, min_arg, x)[1] - (i - 1) *
                 actual_spacing) / dlength(x)
+            println("Postquad")
             err = abs(x - x_minus1)
         end
         new_x_locs[Int64(i)] = x
+        iter_count += 1
+        if iter_count > 30
+            println("Iteration limit reached: bombing out with ", err / spacing,
+            "error.")
+        end
     end
     new_x_locs[end] = max_arg
+    println("Spacing end")
     return new_x_locs, spline_length
 end
 

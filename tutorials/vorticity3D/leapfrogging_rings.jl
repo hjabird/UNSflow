@@ -10,6 +10,7 @@ h.bird.1@research.gla.ac.uk
 #=--------------------------- Dependencies -----------------------------------=#
 include("../../src/lowOrder3D/Vorticity3DSimpleCollector.jl")
 include("../../src/lowOrder3D/VortexParticle3D.jl")
+include("../../src/lowOrder3D/DiscreteGeometry3DToVTK.jl")
 include("VortexFlowFeatures.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
 
@@ -23,7 +24,7 @@ basepath = "./output/leapfrogging_rings_"   # Where to write our output files
 save_every = 10                       # Save every 10 steps.
 # Initial conditions
 ring_strength = [1., 1.]
-ring_particles = [30, 30]
+ring_particles = [5, 5]
 ring_radii = [1., 1.]
 ring_locations = [0., 1.]
 
@@ -49,18 +50,16 @@ num_particles = size(particles)[1]
 for i = 1 : num_steps
     # Save the current state to vtk if required
     if (i - 1) % save_every == 0
-        points = zeros(3, num_particles)
+        points = zeros(3, 0)
         point_vorticity = zeros(3, num_particles)
-        cells = Array{WriteVTK.MeshCell, 1}(undef, num_particles)
+        cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
         for j = 1 : num_particles
-            points[:,j] = [particles[j].coord.x,
-                particles[j].coord.y, particles[j].coord.z]
+            points, cells = add_to_VtkMesh(points, cells, particles[j].geometry)
             point_vorticity[:, j] = [particles[j].vorticity.x,
                 particles[j].vorticity.y, particles[j].vorticity.z]
-            cells[j] = WriteVTK.MeshCell(WriteVTK.VTKCellTypes.VTK_VERTEX, [j])
         end
         vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
-        WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
+        WriteVTK.vtk_cell_data(vtkfile, point_vorticity, "vorticity")
         outfiles = WriteVTK.vtk_save(vtkfile)
     end
 

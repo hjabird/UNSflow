@@ -127,16 +127,16 @@ function state_vector(this::VortexParticle3D)
     # Because of the way vortex particles work, we it has to be redefined
     # there too
     state_vect = Vector{Float64}(undef, 6)
-    state_vect[1:3] = convert(Vector{Float64}, this.goemetry.coord)
+    state_vect[1:3] = convert(Vector{Float64}, this.geometry.coord)
     state_vect[4:6] = convert(Vector{Float64}, this.vorticity)
     return state_vect
 end
 
 function update_using_state_vector(
     this::VortexParticle3D,
-    state_vector::Vector{Float64})
+    state_vect::Vector{Float64})
 
-    state_vect[1:3] = convert(Vector{Float64}, this.goemetry.coord)
+    state_vect[1:3] = convert(Vector{Float64}, this.geometry.coord)
     state_vect[4:6] = convert(Vector{Float64}, this.vorticity)
     state_vect = state_vect[7:end]
     return state_vect
@@ -148,8 +148,11 @@ function state_time_derivative(
     # We assume here that the change in due only due to convection of points.
     # Otherwise we need to specially define this such as for VortexParticle3D
     deriv_vect = Vector{Float64}(undef, 6)
-    deriv_vect[1:3] = induced_velocity(this, inducing_bodies)
-    deriv_vect[4:6] = nduced_velocity_curl(b, a.geometry.coord) * this.vorticity
+    deriv_vect[1:3] = convert(Vector{Float64},
+            induced_velocity(inducing_bodies, this.geometry.coord))
+    deriv_vect[4:6] = convert(Vector{Float64},
+            induced_velocity_curl(inducing_bodies, this.geometry.coord) *
+            this.vorticity )
     return deriv_vect
 end
 

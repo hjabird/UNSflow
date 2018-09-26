@@ -1,7 +1,9 @@
 #===============================================================================
-sheet_rollup.jl
+state_space_sheet_rollup.jl
 
-A demo of a sheet of vortex particles rollling up.
+A demo of a sheet of vortex particles rollling up, but this time using
+the DifferenetialEquations package and a state space representation to get
+the system solved more accurately and, hopefully, more quickly.
 
 HJA Bird 2018
 h.bird.1@research.gla.ac.uk
@@ -18,14 +20,14 @@ include("../../src/lowOrder3D/Vortex3DRegularisationFunctions.jl")
 include("../../src/lowOrder3D/DiscreteGeometry3DToVTK.jl")
 include("VortexFlowFeatures.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
+import DifferentialEquations
 
 #---------------------------- User parameters --------------------------------=#
 # ODE integration parameters
-num_steps = 300
-dt = 0.05
+max_time = 15                         # seconds.
 # Data saving parameters
-basepath = "./output/sheet_rollup_"   # Where to write our output files
-save_every = 10                       # Save every 10 steps.
+basepath = "./output/state_space_sheet_rollup_"   # Where to write our output files
+save_every = 0.5                      # Save every 0.5 seconds
 
 # We can make a sheet of vortex particles defined by functions. Lets make
 # a flat sheet for now, because the function that does the work here
@@ -58,25 +60,37 @@ particles = vortex_particle_sheet(
 num_particles = length(particles)
 
 #=-------------------------- ODE time integration ----------------------------=#
-for i = 1 : num_steps
-    # Save the current state to vtk if required
-    if (i - 1) % save_every == 0
-        points = zeros(3, 0)
-        point_vorticity = zeros(3, num_particles)
-        cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
-        for j = 1 : num_particles
-            points, cells = add_to_VtkMesh(points, cells, particles[j].geometry)
-            point_vorticity[:, j] = [particles[j].vorticity.x,
-                particles[j].vorticity.y, particles[j].vorticity.z]
-        end
-        vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
-        WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
-        outfiles = WriteVTK.vtk_save(vtkfile)
+time = 0.0
+state = state_vector(particles)
+state_deriv_calls = 0
+function dstate(state_vect :: Vector{Float64})
+    update_using_state_vector!(particles, state_vect)
+    state_deriv_calls += 1
+    return state_time_derivative(particles, particles)
+end
+f(u, p, t) = dstate(u)
+while time < max_time
+    update_using_state_vector!(particles, state)
+    points = zeros(3, 0)
+    point_vorticity = zeros(3, num_particles)
+    cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
+    for j = 1 : num_particles
+        points, cells = add_to_VtkMesh(points, cells, particles[j].geometry)
+        point_vorticity[:, j] = [particles[j].vorticity.x,
+            particles[j].vorticity.y, particles[j].vorticity.z]
     end
+    vtkfile = WriteVTK.vtk_grid(string(basepath, Int32(time/save_every)),
+        points, cells)
+    WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
+    outfiles = WriteVTK.vtk_save(vtkfile)
+
 
     # Calculate the next iteration
-    euler!(particles, particles, dt)
+    prob = DifferentialEquations.ODEProblem(f, state, (time, time+save_every))
+    solution = DifferentialEquations.solve(prob)
+    state = solution.u[end]
+    time += save_every
 end
-
+println("Called ind_vel ", state_deriv_calls, " times.")
 #=------------------- Now repeat until it doesn't blow up --------------------=#
 end
