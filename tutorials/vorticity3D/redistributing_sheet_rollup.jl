@@ -26,7 +26,7 @@ num_steps = 300
 dt = 0.05
 # Data saving parameters
 basepath = "./output/redistributing_sheet_rollup_"# Where to write our output files
-save_every = 20                      # Save every 20 steps.
+save_every = 4                      # Save every 20 steps.
 redistribute_every = 5               # Redistribute the particles every 10
 
 # We can make a sheet of vortex particles defined by functions. Lets make
@@ -64,14 +64,13 @@ end
 
 #=-------------------------- ODE time integration ----------------------------=#
 for i = 1 : num_steps
+    println("Vorticity: ", vorticity(particles))
     # Save the current state to vtk if required
     num_particles = length(particles)
     if (i - 1) % save_every == 0
-        points = zeros(3, 0)
         point_vorticity = zeros(3, num_particles)
-        cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
+        points, cells = to_VtkMesh(map(x->x.geometry, particles))
         for j = 1 : num_particles
-            points, cells = add_to_VtkMesh(points, cells, particles[j].geometry)
             point_vorticity[:, j] = [particles[j].vorticity.x,
                 particles[j].vorticity.y, particles[j].vorticity.z]
         end
@@ -88,7 +87,6 @@ for i = 1 : num_steps
         adaptive_update!(particles)
         println("There are now ", length(particles), " particles.")
     end
-    println("Vorticity: ", vorticity(particles))
 end
 
 #=------------------- Now repeat until it doesn't blow up --------------------=#

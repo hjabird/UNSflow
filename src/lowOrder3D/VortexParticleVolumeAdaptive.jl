@@ -42,7 +42,7 @@ mutable struct VortexParticleVolumeAdaptive <: Vorticity3DAdaptive
         particles::Vector{VortexParticle3D},
         gridsize :: Float64,
         new_particle_regularisation=threed_winckelmans_kernels(),
-        redistribution_scheme=m4_redistribution_scheme)
+        redistribution_scheme=first_order_redistribution_scheme)
 
         new(particles, gridsize,
             new_particle_regularisation, redistribution_scheme)
@@ -70,6 +70,9 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
         end
         u_crit -= 0.1
     end
+    minmaxx = (minmaxx[1] - u_crit * stepx, minmaxx[2] + u_crit * stepx)
+    minmaxy = (minmaxy[1] - u_crit * stepy, minmaxy[2] + u_crit * stepy)
+    minmaxz = (minmaxz[1] - u_crit * stepz, minmaxz[2] + u_crit * stepz)
     # Box our particles up into u_crit sized boxes
     boxes = Dict{Tuple{Int32, Int32, Int32}, Vector{VortexParticle3D}}()
     function coord_to_box_idx(coord::Vector3D)
@@ -90,13 +93,6 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
         to_u = (a,b,s)->abs(a - b)/s
         coef = rs(to_u(pc.x, mc.x, stepx)) * rs(to_u(pc.y, mc.y, stepy)) *
             rs(to_u(pc.z, mc.z, stepz))
-        #=println(pc)
-        println(mc)
-        println(rs(to_u(pc.x, mc.x, stepx)))
-        println(rs(to_u(pc.y, mc.y, stepy)))
-        println(rs(to_u(pc.z, mc.z, stepz)))
-        println(coef)
-        print("\n")=#
         return coef * particle.vorticity
     end
     function make_new_particle(i::Int64, j::Int64, k::Int64)
@@ -120,7 +116,8 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
         end
         return
     end
-    all_idxs = [(i, j, k) for i=1:nx, j=1:ny, k=1:nz]
+    all_idxs = [(i, j, k) for i=1:nx+2*ceil(u_crit), j=1:ny+2*ceil(u_crit),
+        k=1:nz+2*ceil(u_crit)]
     for idx in all_idxs
         make_new_particle(Int64(idx[1]), Int64(idx[2]), Int64(idx[3]))
     end
