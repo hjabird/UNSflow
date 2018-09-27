@@ -26,8 +26,8 @@ num_steps = 300
 dt = 0.05
 # Data saving parameters
 basepath = "./output/redistributing_sheet_rollup_"# Where to write our output files
-save_every = 1                       # Save every 10 steps.
-redistribute_every = 5000               # Redistribute the particles every 10
+save_every = 20                      # Save every 20 steps.
+redistribute_every = 5               # Redistribute the particles every 10
 
 # We can make a sheet of vortex particles defined by functions. Lets make
 # a flat sheet for now, because the function that does the work here
@@ -61,11 +61,11 @@ particles = VortexParticleVolumeAdaptive(Vector{VortexParticle3D}(),0.1)
 for child in get_children(particles_non_redistributing)
     push!(particles, child)
 end
-num_particles = length(particles)
 
 #=-------------------------- ODE time integration ----------------------------=#
 for i = 1 : num_steps
     # Save the current state to vtk if required
+    num_particles = length(particles)
     if (i - 1) % save_every == 0
         points = zeros(3, 0)
         point_vorticity = zeros(3, num_particles)
@@ -88,6 +88,7 @@ for i = 1 : num_steps
         adaptive_update!(particles)
         println("There are now ", length(particles), " particles.")
     end
+    println("Vorticity: ", vorticity(particles))
 end
 
 #=------------------- Now repeat until it doesn't blow up --------------------=#

@@ -42,7 +42,7 @@ mutable struct VortexParticleVolumeAdaptive <: Vorticity3DAdaptive
         particles::Vector{VortexParticle3D},
         gridsize :: Float64,
         new_particle_regularisation=threed_winckelmans_kernels(),
-        redistribution_scheme=second_order_redistribution_scheme)
+        redistribution_scheme=m4_redistribution_scheme)
 
         new(particles, gridsize,
             new_particle_regularisation, redistribution_scheme)
@@ -50,6 +50,8 @@ mutable struct VortexParticleVolumeAdaptive <: Vorticity3DAdaptive
 end
 
 function adaptive_update!(a::VortexParticleVolumeAdaptive)
+    # Collect some data so we know a neglidgable vorticity when we see it.
+    ave_vorticity = mapreduce(x->abs(x.vorticity), +, a.children, init=0.0)
     # Calculate the extrema and how many the number of particles in each dir.
     minmaxx = extrema(map(x->x.geometry.coord.x, a.children))
     minmaxy = extrema(map(x->x.geometry.coord.y, a.children))
@@ -57,18 +59,23 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
     nx = ceil((minmaxx[2] - minmaxx[1]) / a.gridsize) + 1
     ny = ceil((minmaxy[2] - minmaxy[1]) / a.gridsize) + 1
     nz = ceil((minmaxz[2] - minmaxz[1]) / a.gridsize) + 1
-    stepx = (minmaxx[2] - minmaxx[1]) / (nx - 1)
-    stepy = (minmaxy[2] - minmaxy[1]) / (ny - 1)
-    stepz = (minmaxz[2] - minmaxz[1]) / (nz - 1)
+    stepx = (nx == 1 ? 1.0 : (minmaxx[2] - minmaxx[1]) / (nx - 1))
+    stepy = (ny == 1 ? 1.0 : (minmaxy[2] - minmaxy[1]) / (ny - 1))
+    stepz = (nz == 1 ? 1.0 : (minmaxz[2] - minmaxz[1]) / (nz - 1))
     # Work out the area we need to consider for our redistribution scheme.
-    u_crit = mapreduce(x->a.redistribution_scheme(x) > 0 ? 99999 : x,
-        min, [0.1:0.1:20;])
+    u_crit = 20.
+    while true
+        if abs(a.redistribution_scheme(u_crit)) > 0
+            break
+        end
+        u_crit -= 0.1
+    end
     # Box our particles up into u_crit sized boxes
     boxes = Dict{Tuple{Int32, Int32, Int32}, Vector{VortexParticle3D}}()
     function coord_to_box_idx(coord::Vector3D)
-        return (ceil(coord.x - minmaxx[1])/u_crit,
-                ceil(coord.y - minmaxy[1])/u_crit,
-                ceil(coord.z - minmaxz[1])/u_crit)
+        return (ceil((coord.x - minmaxx[1])/(u_crit * stepx)),
+                ceil((coord.y - minmaxy[1])/(u_crit * stepy)),
+                ceil((coord.z - minmaxz[1])/(u_crit * stepz)))
     end
     for child in a.children
         idx = coord_to_box_idx(child.geometry.coord)
@@ -80,7 +87,16 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
         pc = particle.geometry.coord
         mc = coordinate
         rs = a.redistribution_scheme
-        coef = rs(abs(pc.x - mc.x)) * rs(abs(pc.y - mc.y))*rs(abs(pc.z - mc.z))
+        to_u = (a,b,s)->abs(a - b)/s
+        coef = rs(to_u(pc.x, mc.x, stepx)) * rs(to_u(pc.y, mc.y, stepy)) *
+            rs(to_u(pc.z, mc.z, stepz))
+        #=println(pc)
+        println(mc)
+        println(rs(to_u(pc.x, mc.x, stepx)))
+        println(rs(to_u(pc.y, mc.y, stepy)))
+        println(rs(to_u(pc.z, mc.z, stepz)))
+        println(coef)
+        print("\n")=#
         return coef * particle.vorticity
     end
     function make_new_particle(i::Int64, j::Int64, k::Int64)
@@ -88,8 +104,8 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
             minmaxy[1] + stepy * (j - 1), minmaxz[1] + stepz * (k - 1))
         box_idx = coord_to_box_idx(coordinate)
         npidxs = [(i, j, k) for   i = box_idx[1]-1:box_idx[1]+1,
-                                j = box_idx[2]-1:box_idx[2]+1,
-                                k = box_idx[3]-1:box_idx[3]+1]
+                                  j = box_idx[2]-1:box_idx[2]+1,
+                                  k = box_idx[3]-1:box_idx[3]+1]
         vorticity = Vector3D(0,0,0)
         for npidx in npidxs
             in_the_box =  get(boxes, npidx, Vector{VortexParticle3D}())
@@ -98,7 +114,7 @@ function adaptive_update!(a::VortexParticleVolumeAdaptive)
                     +, in_the_box)
             end
         end
-        if abs(vorticity) > 0
+        if abs(vorticity) > ave_vorticity * 0.0001
             push!(new_particles, VortexParticle3D(coordinate, vorticity,
                 1.3 * a.gridsize, a.new_particle_regularisation))
         end

@@ -105,7 +105,7 @@ end
 
 #= Default vorticity body methods --------------------------------------------=#
 function vorticity(a::Vorticity3DCollector)
-    return mapreduce(vorticity, 0.0, +, a.children)
+    return mapreduce(vorticity, +, a.children, init=Vector3D(0,0,0))
 end
 
 function centre(a::Vorticity3DCollector)
