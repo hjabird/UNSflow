@@ -54,6 +54,43 @@ include("PolyLine2.jl")
         return filepoints, filecells
     end
 
+    function add_to_VtkMesh(
+        filepoints :: Matrix{Float64},
+        filecells :: Vector{WriteVTK.MeshCell},
+        geometry :: Vector{T}
+        ) where T <: DiscreteGeometry3D
+        @assert(size(filepoints)[1] == 3, "expected 3 by n-points array!")
+        point_count = map(number_of_control_points, geometry)
+        new_points = zeros(3, sum(point_count))
+        point_offset = size(filepoints)[2] + 1
+        new_cells = Vector{WriteVTK.MeshCell}(undef, length(point_count))
+        for i = 1:length(point_count)
+            geom = geometry[i]
+            new_cell_type = vtk_cell_type(geom)
+            c = coords(geom)
+            for cx in c
+                new_points[:, point_offset] = convert(Vector{Float64}, cx)
+                point_offset += 1
+            end
+            new_cells[i] = WriteVTK.MeshCell(new_cell_type,
+                Vector{Int64}(point_offset : point_offset + point_count[i] - 1))
+        end
+        filepoints = hcat(filepoints, new_points)
+        filecells = deepcopy(filecells)
+        filecells = append!(filecells, new_cells)
+        return filepoints, filecells
+    end
+
+    function to_VtkMesh(
+        geometry :: Vector{T}
+        ) where T <: DiscreteGeometry3D
+
+        filepoints = zeros(3, 0)
+        filecells = Vector{WriteVTK.MeshCell}(undef, 0)
+        filepoints, filecells = add_to_VtkMesh(filepoints, filecells, geometry)
+        return filepoints, filecells
+    end
+
     function vtk_cell_type(a::DiscreteGeometry3D)
         error("VTK cell type of ", typeof(a), " has not been defined.")
     end
