@@ -82,12 +82,12 @@ function Base.append!(
     a::Vorticity3DCollector,
     iterable_of_things_to_be_appended)
 
-    @assert(typeof(iterable_of_things_to_be_added) <: Vorticity3D,
+    @assert(eltype(iterable_of_things_to_be_appended) <: Vorticity3D,
         "To add individual Vorticity3D objects you want to use " *
         "push!(a::Vorticity3DCollector, b::Vorticity3D). To add the children " *
         "of a Vorticity3DCollector (\"b\") to this Vorticity3DCollector try " *
         "append!(a::Vorticity3DCollector, get_children(b)).")
-    append!(a.children, to_be_added)
+    append!(a.children, iterable_of_things_to_be_appended)
 end
 
 function Base.pop!(a::Vorticity3DCollector)

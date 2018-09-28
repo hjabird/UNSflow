@@ -60,12 +60,10 @@ induced_velocity_curl(this::Vorticity3D, measurement_point::Vector3D)
 # Applies convection to this body due to velocities induced by
 # influence_field. Uses the forward Euler method.
 function euler!(this::Vorticity3D, influence_field::Vorticity3D, dt::Real)
-    coords = coords(this.goemetry)
-    vel = Vector{Vector3D}(undef, length(coords))
-    for pair in zip(vel, coords)
-        pair[1] = map(x->induced_velocity(influence_field, x), pair[2])
-    end
-    coords += vel
+    state = state_vector(this)
+    dstate = state_time_derivative(this, inducing_field)
+    state += dstate * dt
+    update_using_state_vector(this, state)
     return
 end
 
