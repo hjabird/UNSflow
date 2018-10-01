@@ -26,10 +26,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vorticity3DAdaptive.jl")
-include("VortexParticle3D.jl")
-include("Vortex3DRegularisationFunctions.jl")
-include("RedistributionScheme.jl")
 
 mutable struct VortexParticleVolumeAdaptive <: Vorticity3DAdaptive
     children :: Vector{VortexParticle3D}

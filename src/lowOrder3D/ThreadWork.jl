@@ -29,8 +29,7 @@
 
 mutable struct ThreadWorkload
     maxidx :: Int64     # This should stay constant
-    nextindex :: Int64  # Needs lock to avoid read before write etc.
-    idx_lock :: Threads.SpinLock
+    nextindex :: Threads.Atomic{Int64}  # Needs lock to avoid read before write etc.
     children :: Vector{ThreadWorkload}
     child_lock :: Threads.SpinLock  # Lock readwrite access to children vect
     worker_count :: Threads.Atomic{Int64}
@@ -41,7 +40,7 @@ mutable struct ThreadWorkload
         object :: Any
         )
 
-        new(length(object), 1, Threads.SpinLock(), Vector{ThreadWorkload}(),
+        new(length(object), Threads.Atomic{Int64}(1), Vector{ThreadWorkload}(),
             Threads.SpinLock(), Threads.Atomic{Int64}(0), object)
     end
 end
@@ -51,13 +50,10 @@ mutable struct ThreadState
 end
 
 function next_idx!(a::ThreadWorkload)
-    w = Int64(-1)
-    Threads.lock(a.idx_lock)
-    if a.nextindex <= a.maxidx
-        w = a.nextindex
-        a.nextindex += Int64(1)
+    w = Threads.atomic_add!(a.nextindex, 1)
+    if w > a.maxidx
+        w = -1
     end
-    Threads.unlock(a.idx_lock)
     return w
 end
 
@@ -88,7 +84,6 @@ function exit_ThreadWorkload!(a::ThreadState)
 end
 
 function apply_to_tree(func::Function, root::Any, iterable_supertype)
-    local worker_func
     function worker_func()
         tstate = ts[Threads.threadid()]
         while length(tstate.workloads) > 0
@@ -103,16 +98,15 @@ function apply_to_tree(func::Function, root::Any, iterable_supertype)
             elseif typeof(workld.object[idx]) <: iterable_supertype
                 add_child!(tstate, ThreadWorkload(workld.object[idx]))
             else
-                counts[Threads.threadid()] += 1
+                func(workld.object[idx])
             end
         end
     end
     ts = Vector{ThreadState}(undef, Threads.nthreads())
-    startstate = ThreadState([ThreadWorkload(root)])
     for i = 1 : Threads.nthreads()
-        ts[i] = deepcopy(startstate)
+        startstate = ThreadState([ThreadWorkload(root)])
+        ts[i] = startstate
     end
-    #worker_func()
-    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), worker_func)
+    @time ccall(:jl_threading_run, Ref{Cvoid}, (Any,), worker_func)
     return
 end

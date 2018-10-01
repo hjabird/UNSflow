@@ -47,7 +47,7 @@ end
 num_particles = size(particles)[1]
 
 #=-------------------------- ODE time integration ----------------------------=#
-for i = 1 : num_steps
+@time for i = 1 : num_steps
     # Save the current state to vtk if required
     if (i - 1) % save_every == 0
         points = zeros(3, 0)

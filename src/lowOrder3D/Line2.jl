@@ -25,7 +25,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("DiscreteGeometry3D.jl")
 
 mutable struct Line2 <: DiscreteGeometry3D
     start_coord :: Vector3D

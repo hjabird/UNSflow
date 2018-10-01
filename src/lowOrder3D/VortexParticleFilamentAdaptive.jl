@@ -25,10 +25,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vorticity3DAdaptive.jl")
-include("VortexParticle3D.jl")
-include("Vortex3DRegularisationFunctions.jl")
-include("RedistributionScheme.jl")
 import Dierckx
 import QuadGK
 

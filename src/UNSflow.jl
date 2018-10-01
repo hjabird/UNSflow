@@ -2,21 +2,21 @@ __precompile__(true)
 
 module UNSflow
 
-using Dierckx: Spline1D, derivative, evaluate
+import Dierckx: Spline1D, derivative, evaluate
 
-using ForwardDiff
+import ForwardDiff
 
-using NLsolve: nlsolve, not_in_place
+import NLsolve: nlsolve, not_in_place
 
-using PyCall
-pygui(:tk)
+import PyCall
+PyCall.pygui(:tk)
 
-using PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
+import PyPlot: plot, scatter, figure, xlabel, ylabel, xlim, ylim,
 xticks, yticks, subplot, legend, axis, savefig, close
 
-using SpecialFunctions: erf
+import SpecialFunctions: erf
 
-using LaTeXStrings: @L_str
+import LaTeXStrings: @L_str
 
 export
     # kinematics types and funtions
@@ -114,7 +114,25 @@ export
     # 3D plot output functions
     makeForcePlots3Dstrip,
     makeVortPlots3Dstrip,
-    makeTevstrPlots3Dstrip
+    makeTevstrPlots3Dstrip,
+
+    # 3D Geometry
+    DiscreteGeometry3D,
+    Line2,
+    Point3D,
+    PolyLine2,
+    Vector3D,
+
+    # 3D Vorticity
+    Vorticity3D,
+    Vorticity3DCollector,
+    Vorticity3DSimpleCollector,
+    Vorticity3DAdaptive,
+    VortexParticleFilamentAdaptive,
+    VortexParticleVolumeAdaptive,
+    VortexParticle3D,
+    VortexRing,
+    StraightVortexFilament
 
 ### source files
 
@@ -138,13 +156,24 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 # include("lowOrder3D/calcs.jl")               # calculation functions
 # include("lowOrder3D/solvers.jl")             # solver methods
 # include("lowOrder3D/postprocess.jl")         # postprocessing functions
-include("lowOrder3D/ThreeDVector.jl")
-include("lowOrder3D/ThreeDVorticity.jl")
-include("lowOrder3D/ThreeDVorticityCollector.jl")
-include("lowOrder3D/ThreeDVorticitySimpleCollector.jl")
-include("lowOrder3D/ThreeDStraightVortexFilament.jl")
-include("lowOrder3D/ThreeDVortexRing.jl")
-include("lowOrder3D/ThreeDVortexParticle.jl")
+include("lowOrder3D/ThreadWork.jl")
+include("lowOrder3D/Vector3D.jl")
+include("lowOrder3D/DiscreteGeometry3D.jl")
+include("lowOrder3D/Point3D.jl")
+include("lowOrder3D/Line2.jl")
+include("lowOrder3D/PolyLine2.jl")
+include("lowOrder3D/DiscreteGeometry3DToVTK.jl")
+include("lowOrder3D/Vortex3DRegularisationFunctions.jl")
+include("lowOrder3D/RedistributionScheme.jl")
+include("lowOrder3D/Vorticity3D.jl")
+include("lowOrder3D/Vorticity3DCollector.jl")
+include("lowOrder3D/Vorticity3DSimpleCollector.jl")
+include("lowOrder3D/Vorticity3DAdaptive.jl")
+include("lowOrder3D/StraightVortexFilament.jl")
+include("lowOrder3D/VortexParticle3D.jl")
+include("lowOrder3D/VortexRing.jl")
+include("lowOrder3D/VortexParticleFilamentAdaptive.jl")
+include("lowOrder3D/VortexParticleVolumeAdaptive.jl")
 
 # 2D plotting functions
 include("plots/plots2D.jl")

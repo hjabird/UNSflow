@@ -23,7 +23,7 @@ data at intervals. These can be used to create plots and movies of the
 flowfield.
 
 `delvort` is used to control the vortex count. The simulation cost
-increases as O(n``\^2``) with number of vortices in the flow field and so
+increases as O(n``^2``) with number of vortices in the flow field and so
 long run times can get very computationally expensive. Look at
 `?delVortDef` for algorthims to control vortex count.
 
@@ -433,8 +433,8 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
             xloc_tev = surf.bnd_x[surf.ndiv] + 0.5*surf.kinem.u*dt
             zloc_tev = surf.bnd_z[surf.ndiv]
         else
-            xloc_tev = surf.bnd_x[surf.ndiv]+(1./3.)*(curfield.tev[ntev].x - surf.bnd_x[surf.ndiv])
-            zloc_tev = surf.bnd_z[surf.ndiv]+(1./3.)*(curfield.tev[ntev].z - surf.bnd_z[surf.ndiv])
+            xloc_tev = surf.bnd_x[surf.ndiv]+(1. /3.)*(curfield.tev[ntev].x - surf.bnd_x[surf.ndiv])
+            zloc_tev = surf.bnd_z[surf.ndiv]+(1. /3.)*(curfield.tev[ntev].z - surf.bnd_z[surf.ndiv])
         end
 
         for ib = 1:surf.ndiv
@@ -454,7 +454,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         #Calc first 3 fourier coefficients and derivatives
         surf.a0[1] = J1 + J2*tevstr
         for ia = 1:3
-            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Calculate adot
@@ -479,8 +479,8 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
                 xloc_lev = surf.bnd_x[1] + 0.5*le_vel_x*dt
                 zloc_lev = surf.bnd_z[1] + 0.5*le_vel_z*dt
             else
-                xloc_lev = surf.bnd_x[1] + (1./3.)*(curfield.lev[nlev].x - surf.bnd_x[1])
-                zloc_lev = surf.bnd_z[1]+(1./3.)*(curfield.lev[nlev].z - surf.bnd_z[1])
+                xloc_lev = surf.bnd_x[1] + (1. /3.)*(curfield.lev[nlev].x - surf.bnd_x[1])
+                zloc_lev = surf.bnd_z[1]+(1. /3.)*(curfield.lev[nlev].z - surf.bnd_z[1])
             end
 
             for ib = 1:surf.ndiv
@@ -500,7 +500,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
             #Recalculate required fourier terms
             surf.a0[1] = J1 + J2*tevstr + J3*levstr
             for ia = 1:3
-                surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta) + levstr*simpleTrapz(T3.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
+                surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta) + levstr*simpleTrapz(T3.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
             end
 
             push!(curfield.tev, TwoDVort(xloc_tev, zloc_tev, tevstr, vcore, 0., 0.))
@@ -516,7 +516,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         update_indbound(surf, curfield)
         update_downwash(surf, [curfield.u[1],curfield.w[1]])
         for ia = 4:surf.naterm
-            surf.aterm[ia] = 2.*(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Set previous values of aterm to be used for derivatives in next time step

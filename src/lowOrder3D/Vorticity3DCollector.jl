@@ -26,8 +26,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vorticity3D.jl")
-include("Vector3D.jl")
 
 abstract type Vorticity3DCollector <: Vorticity3D
 end
@@ -137,10 +135,23 @@ function euler!(
     dt::Real)
     # So we can call the update methods of our children...
     cpy = deepcopy(a)
-    for child in cpy.children
-        euler!(child, b, dt)
+
+    nxt_time = zeros(Threads.nthreads())
+    function _euler_local_func!(vort_obj::Vorticity3D)
+        t1 = time_ns()
+        euler!(vort_obj, b, dt)
+        t2 = time_ns()
+        nxt_time[Threads.threadid()] += (t2 - t1) / 1e9
+        return
     end
+    apply_to_tree(_euler_local_func!, cpy, Vorticity3DCollector)
+    #=for child in cpy.children
+        euler!(child, b, dt)
+    end=#
     a.children = cpy.children
+    for nxtt in  nxt_time
+        println(nxtt)
+    end
     return
 end
 

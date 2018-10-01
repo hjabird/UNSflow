@@ -23,11 +23,8 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vector3D.jl")
-include("Vorticity3D.jl")
-include("PolyLine2")
 
-type VortexRing <: Vorticity3D
+mutable struct VortexRing <: Vorticity3D
     geometry :: PolyLine2
     strength :: Float64
 
@@ -60,14 +57,14 @@ function VortexRing()
 end
 
 function convert(
-    ::Type{Vector{ThreeDStraightVortexFilament}},
+    ::Type{Vector{StraightVortexFilament}},
     a::VortexRing)
-    b = Vector{ThreeDStraightVortexFilament}(4)
+    b = Vector{StraightVortexFilament}(4)
     coords = a.goemetry.coords
-    b[1] = ThreeDStraightVortexFilament(coords[1], coords[2], a.strength)
-    b[2] = ThreeDStraightVortexFilament(coords[2], coords[3], a.strength)
-    b[3] = ThreeDStraightVortexFilament(coords[3], coords[4], a.strength)
-    b[4] = ThreeDStraightVortexFilament(coords[4], coords[1], a.strength)
+    b[1] = StraightVortexFilament(coords[1], coords[2], a.strength)
+    b[2] = StraightVortexFilament(coords[2], coords[3], a.strength)
+    b[3] = StraightVortexFilament(coords[3], coords[4], a.strength)
+    b[4] = StraightVortexFilament(coords[4], coords[1], a.strength)
     return b
 end
 
@@ -105,7 +102,7 @@ function induced_velocity_curl(
     ring :: VortexRing,
     measurement_point :: Vector3D
     )
-    fils = convert(Vector{ThreeDStraightVortexFilament}, ring)
+    fils = convert(Vector{StraightVortexFilament}, ring)
     return mapreduce(x->induced_velocity(x, measurement_loc),
         [0. 0. 0.; 0. 0. 0.; 0. 0. 0.], +, fils)
 end

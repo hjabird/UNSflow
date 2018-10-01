@@ -25,10 +25,7 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("DiscreteGeometry3D.jl")
-include("Line2.jl")
-include("Point3D.jl")
-include("PolyLine2.jl")
+
 #try
     import WriteVTK
 

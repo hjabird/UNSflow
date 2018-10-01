@@ -25,10 +25,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vector3D.jl")
-include("Point3D.jl")
-include("Vortex3DRegularisationFunctions.jl")
-include("Vorticity3D.jl")
 
 mutable struct VortexParticle3D <: Vorticity3D
     geometry :: Point3D

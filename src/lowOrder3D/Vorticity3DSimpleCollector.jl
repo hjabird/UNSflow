@@ -26,7 +26,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Vorticity3DCollector.jl")
 
 # All methods are inherited from the Vorticity3DCollector supertype.
 

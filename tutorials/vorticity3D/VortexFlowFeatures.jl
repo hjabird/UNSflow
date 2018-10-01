@@ -13,12 +13,12 @@ h.bird.1@research.gla.ac.uk
 
 """ Generates an array of vortex particles representing a vortex ring"""
 function vortex_particle_ring(
-    centre::Vector3D,
-    normal_to_ring::Vector3D,
+    centre::UNSflow.Vector3D,
+    normal_to_ring::UNSflow.Vector3D,
     radius::Float64,
     strength::Float64,
     num_particles::Int64,
-    kernel::Vortex3DRegularisationFunctions
+    kernel::UNSflow.Vortex3DRegularisationFunctions
     )
 
     @assert(radius > 0)
@@ -61,7 +61,7 @@ function vortex_particle_ring(
             )
         particles[i] = p
     end
-    particle_collector = Vorticity3DSimpleCollector(particles)
+    particle_collector = UNSflow.Vorticity3DSimpleCollector(particles)
     return particle_collector
 end
 
@@ -81,7 +81,7 @@ function vortex_particle_sheet(
     bounds::Array{Float64}, # [minx, maxx, miny, maxy]
     num_x::Int64,
     num_y::Int64,
-    kernel::Vortex3DRegularisationFunctions
+    kernel::UNSflow.Vortex3DRegularisationFunctions
     )
 
     @assert(num_x > 0)
@@ -92,21 +92,21 @@ function vortex_particle_sheet(
     xs = linspace(bounds[1], bounds[2], num_x)
     ys = linspace(bounds[3], bounds[4], num_y)
     num_particles = num_x * num_y
-    particles = Array{VortexParticle3D, 1}(undef, num_particles)
+    particles = Array{UNSflow.VortexParticle3D, 1}(undef, num_particles)
 
     for i = 1:num_x
         for j = 1:num_y
-            z = Vector3D(0., 0., 0.)
+            z = UNSflow.Vector3D(0., 0., 0.)
             coord = geometry_func(xs[i], ys[j])
             # So this will be wrong for now.
             patch_size = ((bounds[2]-bounds[1])/num_x) *
                 ((bounds[4]-bounds[3])/num_y)
             vort = vorticity_func(xs[i], ys[j]) * patch_size
             vort_size = 1.3 * sqrt(patch_size) / 2
-            particles[num_x * (j - 1) + i] = VortexParticle3D(
+            particles[num_x * (j - 1) + i] = UNSflow.VortexParticle3D(
                 coord, vort, vort_size, kernel)
         end
     end
 
-    return Vorticity3DSimpleCollector(particles)
+    return UNSflow.Vorticity3DSimpleCollector(particles)
 end

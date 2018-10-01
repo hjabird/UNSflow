@@ -25,7 +25,6 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-include("Line2.jl")
 
 mutable struct StraightVortexFilament <: Vorticity3D
     geometry :: Line2
