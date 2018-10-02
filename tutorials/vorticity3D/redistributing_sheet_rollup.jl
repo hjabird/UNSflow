@@ -10,12 +10,12 @@ h.bird.1@research.gla.ac.uk
 #=--------------------------- Dependencies -----------------------------------=#
 # Plotting in Julia on my PC is broken, so I have to load dependencies like
 # this. If yours works, try import UNSflow instead.
-let
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 include("VortexFlowFeatures.jl")
 import WriteVTK  # We'll use this package to output to VTK for visualisation.
 
+function main()
 #---------------------------- User parameters --------------------------------=#
 # ODE integration parameters
 num_steps = 10
@@ -88,3 +88,5 @@ end
 
 #=------------------- Now repeat until it doesn't blow up --------------------=#
 end
+
+main()

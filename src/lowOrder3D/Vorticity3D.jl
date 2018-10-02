@@ -124,3 +124,25 @@ function state_time_derivative(
     end
     return deriv_vect
 end
+
+function vorticity_velocity_influence_matrix(
+    this::Vorticity3D,
+    measurement_points::Vector{Vector3D}
+    )
+    # We assume here that everything is linear - take vorticity values to be 1
+    # individual and compute
+    matrix_vector = Vector{Matrix{Float64}}()
+    if typeof(this) <: Vorticity3DCollector
+        for child in get_children(this)
+            append!(deriv_vect,
+                vorticity_velocity_influence_matrix(child, inducing_bodies))
+        end
+    else
+        coord_vect = coords(this.geometry)
+        for c in coord_vect
+            append!(deriv_vect,
+                convert(Vector{Float64}, induced_velocity(this, inducing_bodies)))
+        end
+    end
+    return deriv_vect
+end

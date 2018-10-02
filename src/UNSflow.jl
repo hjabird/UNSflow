@@ -31,6 +31,7 @@ export
     EldUpInttstartDef,
     SinDef,
     CosDef,
+    StepGustDef,
 
     # 2D low-order solver types
     TwoDSurf,

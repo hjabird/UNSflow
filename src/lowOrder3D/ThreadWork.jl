@@ -84,13 +84,15 @@ function exit_ThreadWorkload!(a::ThreadState)
 end
 
 function apply_to_tree(func::Function, root::Any, iterable_supertype)
+    local worker_func
     function worker_func()
-        tstate = ts[Threads.threadid()]
+        local tstate = ts[Threads.threadid()]
         while length(tstate.workloads) > 0
             workld = tstate.workloads[end]
             idx = next_idx!(workld)
             if idx < 0
                 if length(workld.children) > 0
+                    break
                     enter_TheadWorkload!(tstate, workld.children[1])
                 else
                     exit_ThreadWorkload!(tstate)

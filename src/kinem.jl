@@ -132,6 +132,22 @@ function (kin::CosDef)(t)
   (kin.mean) + (kin.amp)*cos(2*kin.k*t + kin.phi)
 end
 
+struct StepGustDef <: MotionDef
+    amp :: Float64
+    tstart :: Float64
+    tgust :: Float64
+end
+
+function (sgust::StepGustDef)(t)
+    if t >= sgust.tstart && t <= sgust.tstart+sgust.tgust
+        amp = (sgust.amp)
+    else
+        amp = 0.
+    end
+    amp
+end
+
+
 struct EldUpIntDef <: MotionDef
     amp :: Float64
     K :: Float64
