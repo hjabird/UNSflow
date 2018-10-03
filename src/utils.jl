@@ -5,7 +5,7 @@ Clears all timestamp directories in the current folder
 """
 function cleanWrite()
     dirvec = readdir()
-    dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+    dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
     for i =1:length(dirresults)
         rm("$(dirresults[i])", force=true, recursive=true)
     end
@@ -104,20 +104,19 @@ function camber_calc(x::Vector,airfoil::String)
     ndiv = length(x);
     c = x[ndiv];
 
-    cam = Array{Float64}(ndiv)
-    cam_slope = Array{Float64}(ndiv)
-
-    in_air = readdlm(airfoil);
+    cam = Array{Float64}(undef, ndiv)
+    cam_slope = Array{Float64}(undef, ndiv)
+    in_air = DelimitedFiles.readdlm(airfoil, Float64);
     xcoord = in_air[:,1];
     ycoord = in_air[:,2];
     ncoord = length(xcoord);
-    xcoord_sum = Array{Float64}(ncoord);
+    xcoord_sum = zeros(ncoord);
     xcoord_sum[1] = 0;
     for i = 1:ncoord-1
         xcoord_sum[i+1] = xcoord_sum[i] + abs(xcoord[i+1]-xcoord[i]);
     end
     y_spl = Spline1D(xcoord_sum,ycoord);
-    y_ans = Array{Float64}(2*ndiv);
+    y_ans = Array{Float64}(undef, 2*ndiv);
 
     for i=1:ndiv
         y_ans[i] = evaluate(y_spl,x[i]/c);

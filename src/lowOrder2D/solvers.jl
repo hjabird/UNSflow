@@ -47,9 +47,9 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
-        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -122,8 +122,8 @@ function lautat(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dt
     mat = mat'
 
     f = open("resultsSummary", "w")
-    write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    writedlm(f, mat)
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
@@ -134,13 +134,13 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = Array{Float64}(0, 8)
+        mat = zeros(0, 8)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
-        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -208,7 +208,7 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t,nround))"
+                dirname = "$(round(t, digits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -221,8 +221,8 @@ function lautatRoll(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500
     mat = mat'
 
     f = open("resultsSummary", "w")
-    write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    writedlm(f, mat)
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
@@ -233,13 +233,13 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = Array{Float64}(0, 8)
+        mat = zeros(0, 8)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
-        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -343,7 +343,7 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
         # write flow details if required
         if writeflag == 1
             if istep in writeArray
-                dirname = "$(round(t,nround))"
+                dirname = "$(round(t, digits=nround))"
                 writeStamp(dirname, t, surf, curfield)
             end
         end
@@ -356,8 +356,8 @@ function ldvm(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, dtst
     mat = mat'
 
     f = open("resultsSummary", "w")
-    write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    writedlm(f, mat)
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
     close(f)
 
     mat, surf, curfield
@@ -372,9 +372,9 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
-        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary")
         t = mat[end,1]
     elseif startflag == 2
         #for use in strip theory
@@ -457,7 +457,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         #Calc first 3 fourier coefficients and derivatives
         surf.a0[1] = J1 + J2*tevstr
         for ia = 1:3
-            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Calculate adot
@@ -519,7 +519,7 @@ function ldvmLin(surf::TwoDSurf, curfield::TwoDFlowField, nsteps::Int64 = 500, d
         update_indbound(surf, curfield)
         update_downwash(surf, [curfield.u[1],curfield.w[1]])
         for ia = 4:surf.naterm
-            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos.(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos.(ia*surf.theta), surf.theta))/(pi*surf.uref)
+            surf.aterm[ia] = 2. *(simpleTrapz(T1.*cos(ia*surf.theta), surf.theta) + tevstr*simpleTrapz(T2.*cos(ia*surf.theta), surf.theta))/(pi*surf.uref)
         end
 
         #Set previous values of aterm to be used for derivatives in next time step
@@ -556,8 +556,8 @@ end
 mat = mat'
 
 f = open("resultsSummary", "w")
-write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-writedlm(f, mat)
+Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+DelimitedFiles.writedlm(f, mat)
 close(f)
 
 mat, surf, curfield
@@ -569,13 +569,13 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
 
     # If a restart directory is provided, read in the simulation data
     if startflag == 0
-        mat = Array{Float64}(0, 8)
+        mat = zeros(0, 8)
         t = 0.
     elseif startflag == 1
         dirvec = readdir()
-        dirresults = map(x->(v = tryparse(Float64,x); isnull(v) ? 0.0 : get(v)),dirvec)
+        dirresults = map(x->(v = tryparse(Float64,x); typeof(v) == Nothing ? 0.0 : v),dirvec)
         latestTime = maximum(dirresults)
-        mat = readdlm("resultsSummary")
+        mat = DelimitedFiles.readdlm("resultsSummary")
         t = mat[end,1]
     else
         throw("invalid start flag, should be 0 or 1")
@@ -696,8 +696,8 @@ function ldvm(surf::TwoDSurf2DOF, curfield::TwoDFlowField, nsteps::Int64 = 500, 
     mat = mat'
 
     f = open("resultsSummary", "w")
-    write(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
-    writedlm(f, mat)
+    Serialization.serialize(f, ["#time \t", "alpha (deg) \t", "h/c \t", "u/uref \t", "A0 \t", "Cl \t", "Cd \t", "Cm \n"])
+    DelimitedFiles.writedlm(f, mat)
     close(f)
 
     mat, surf, curfield

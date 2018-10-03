@@ -8,6 +8,10 @@ import ForwardDiff
 
 import NLsolve: nlsolve, not_in_place
 
+import DelimitedFiles
+
+import Serialization
+
 import PyCall
 PyCall.pygui(:tk)
 

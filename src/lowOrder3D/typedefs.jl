@@ -1,4 +1,4 @@
-type KinemDef3D
+mutable struct KinemDef3D
     alpha :: MotionDef
     h :: MotionDef
     u :: MotionDef
@@ -8,7 +8,7 @@ type KinemDef3D
     end
 end
 
-immutable ThreeDFieldSimple
+struct ThreeDFieldSimple
     f2d :: Vector{TwoDFlowField}
     function ThreeDFieldSimple()
         f2d = TwoDFlowField[]
@@ -16,7 +16,7 @@ immutable ThreeDFieldSimple
     end
 end
 
-immutable ThreeDSurfSimple
+struct ThreeDSurfSimple
     cref :: Float64
     AR :: Float64
     uref :: Float64
