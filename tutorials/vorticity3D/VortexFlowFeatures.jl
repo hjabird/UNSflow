@@ -61,7 +61,8 @@ function vortex_particle_ring(
             )
         particles[i] = p
     end
-    particle_collector = UNSflow.Vorticity3DSimpleCollector(particles)
+    particle_collector =
+        UNSflow.Vorticity3DSimpleCollector(particles)
     return particle_collector
 end
 

@@ -122,4 +122,37 @@ function euler!(
     return
 end
 
+function state_vector_length(a::StraightVortexFilament)
+    return 2 * 3
+end
+
+function vorticity_vector_length(this::StraightVortexFilament)
+    return 1
+end
+
+function vorticity_vector(this::StraightVortexFilament)
+    return [this.vorticity]
+end
+
+function update_using_vorticity_vector!(
+    this::StraightVortexFilament,
+    vort_vect::Vector{Float64})
+
+    @assert(length(vort_vect) == 1)
+    this.vorticity = vort_vect[1]
+    return
+end
+
+function vorticity_vector_velocity_influence(
+    this::StraightVortexFilament,
+    mes_pnt::Vector3D
+    )
+
+    v = zeros(3, 1)
+    old_vorticity = this.vorticity
+    this.vorticity = 1.
+    v = convert(Vector{Float}, induced_velocity(this, mes_pnt))
+    this.vorticity = old_vorticity;
+    return v
+end
 #= END StraightVortexFilament ------------------------------------------=#

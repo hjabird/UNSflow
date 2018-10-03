@@ -177,6 +177,7 @@ include("lowOrder3D/Vorticity3DAdaptive.jl")
 include("lowOrder3D/StraightVortexFilament.jl")
 include("lowOrder3D/VortexParticle3D.jl")
 include("lowOrder3D/VortexRing.jl")
+include("lowOrder3D/SplineVortexParticleFilament.jl")
 include("lowOrder3D/VortexParticleFilamentAdaptive.jl")
 include("lowOrder3D/VortexParticleVolumeAdaptive.jl")
 

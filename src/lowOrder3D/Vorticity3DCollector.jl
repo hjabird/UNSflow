@@ -170,6 +170,54 @@ function induced_velocity_curl(
     return curly
 end
 
+function state_vector_length(a::Vorticity3DCollector)
+    return mapreduce(state_vector_length, +, this.children, init=0)
+end
+
+function vorticity_vector_length(this::Vorticity3DCollector)
+    return mapreduce(vorticity_vector_length, +, this.children, init=0)
+end
+
+function vorticity_vector(this::Vorticity3DCollector)
+    v = Vector{Float64}()
+    for child in children
+        append!(v, vorticity_vector(child))
+    end
+    return v
+end
+
+function update_using_vorticity_vector!(
+    this::Vorticity3DCollector,
+    vort_vect::Vector{Float64})
+
+    lens = map(vorticity_vector_length, this.children)
+    @assert(mapreduce(x, +, lens, init=0) == length(vort_vect),
+        "Input vorticity vector was the incorrect length.")
+    offset = 1
+    for i = 1 : length(this.children)
+        update_using_state_vector(
+            this.children[i],
+            vort_vect[offset : offset + lens[i] - 1])
+        offset += lens[i]
+    end
+    return
+end
+
+function vorticity_vector_velocity_influence(
+    this::Vorticity3DCollector,
+    mes_pnt::Vector3D
+    )
+
+    lens = map(vorticity_vector_length, this.children)
+    v = zeros(3, sum(lens))
+    offset = 1
+    for i = 1 : length(this.children)
+        v[:, offset : offset + lens[i] - 1] =
+            vorticity_vector_velocity_influence(this.children[i], mes_pnt)
+    end
+    return v
+end
+
 #= Default iterator ----------------------------------------------------------=#
 function Base.getindex(
     a::Vorticity3DCollector,

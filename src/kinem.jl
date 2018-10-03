@@ -53,15 +53,9 @@ end
 function (eld::EldRampReturnDef)(tt)
     fr = eld.K/(pi*abs(eld.amp));
     t1 = 1.
-<<<<<<< HEAD
     t2 = t1 + (1. / (2*pi*fr));
     t3 = t2 + ((1 / (4*fr)) - (1/(2*pi*fr)));
     t4 = t3 + (1. / (2*pi*fr));
-=======
-    t2 = t1 + (1. /(2*pi*fr));
-    t3 = t2 + ((1/(4*fr)) - (1/(2*pi*fr)));
-    t4 = t3 + (1. /(2*pi*fr));
->>>>>>> master
     t5 = t4+1.;
 
     nstep = round(Int,t5/0.015) + 1

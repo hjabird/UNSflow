@@ -119,6 +119,10 @@ function euler!(a::VortexParticle3D, b::Vorticity3D, dt::Real)
     return
 end
 
+function state_vector_length(a::VortexParticle3D)
+    return 6
+end
+
 function state_vector(this::VortexParticle3D)
     # Because of the way vortex particles work, we it has to be redefined
     # there too
@@ -128,12 +132,12 @@ function state_vector(this::VortexParticle3D)
     return state_vect
 end
 
-function update_using_state_vector(
+function update_using_state_vector!(
     this::VortexParticle3D,
     state_vect::Vector{Float64})
 
-    state_vect[1:3] = convert(Vector{Float64}, this.geometry.coord)
-    state_vect[4:6] = convert(Vector{Float64}, this.vorticity)
+    this.geometry.coord = convert(Vector3D, state_vect[1:3])
+    this.vorticity = convert(Vector3D, state_vect[4:6])
     state_vect = state_vect[7:end]
     return state_vect
 end
@@ -152,4 +156,37 @@ function state_time_derivative(
     return deriv_vect
 end
 
+function vorticity_vector_length(this::VortexParticle3D)
+    return 3
+end
+
+function vorticity_vector(this::VortexParticle3D)
+    v = convert(Vector{Float64}, this.vorticity)
+    return v
+end
+
+function update_using_vorticity_vector!(
+    this::VortexParticle3D,
+    vort_vect::Vector{Float64})
+
+    this.vorticity = convert(Vector3D, vort_vect)
+    return
+end
+
+function vorticity_vector_velocity_influence(
+    this::VortexParticle3D,
+    mes_pnt::Vector3D
+    )
+
+    v = zeros(3, 3)
+    old_vorticity = deepcopy(this.vorticity)
+    this.vorticity = Vector3D(1,0,0)
+    v[:, 1] = convert(Vector{Float}, induced_velocity(this, mes_pnt))
+    this.vorticity = Vector3D(0,1,0)
+    v[:, 2] = convert(Vector{Float}, induced_velocity(this, mes_pnt))
+    this.vorticity = Vector3D(0,0,1)
+    v[:, 3] = convert(Vector{Float}, induced_velocity(this, mes_pnt))
+    this.vorticity = old_vorticity;
+    return v
+end
 #= END VortexParticle3D --------------------------------------------------=#

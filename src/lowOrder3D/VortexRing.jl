@@ -119,4 +119,37 @@ function euler!(a::VortexRing, b::Vorticity3D, dt::Real)
     return
 end
 
+function state_vector_length(a::VortexRing)
+    return 4 * 3
+end
+
+function vorticity_vector_length(this::VortexRing)
+    return 1
+end
+
+function vorticity_vector(this::VortexRing)
+    return [this.vorticity]
+end
+
+function update_using_vorticity_vector!(
+    this::VortexRing,
+    vort_vect::Vector{Float64})
+
+    @assert(length(vort_vect) == 1)
+    this.vorticity = vort_vect[1]
+    return
+end
+
+function vorticity_vector_velocity_influence(
+    this::VortexRing,
+    mes_pnt::Vector3D
+    )
+
+    v = zeros(3, 1)
+    old_vorticity = this.vorticity
+    this.vorticity = 1.
+    v = convert(Vector{Float}, induced_velocity(this, mes_pnt))
+    this.vorticity = old_vorticity;
+    return v
+end
 #= END VortexRing ------------------------------------------------------=#
