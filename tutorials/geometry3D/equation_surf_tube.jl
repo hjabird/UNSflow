@@ -1,7 +1,8 @@
 #===============================================================================
-    DiscreteGeometry3D.jl
+    equation_surf_tube.jl
 
-    Represents a geometry defined by points in 3D cartesian space.
+    An example of how one might use EquationSurf to generate a surface.
+    The surface is then discretised and dumped into a VTK file for veiwing.
 
     Initial code: HJAB 2018
 
@@ -26,38 +27,24 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-mutable struct Point3D <: DiscreteGeometry3D
-    coord :: Vector3D
+push!(LOAD_PATH,"../../src/")
+import UNSflow
+import WriteVTK
 
-    function Point3D(a::Vector3D)
-        new(a)
-    end
-end
+# First, we're going to make a tube.
+# We'll put the linear direction in z
+z_def = x->x[2]
+# And the cross section in x,y, remebering we have [-1,1] to work with.
+x_def = x->sin(pi * x[1])
+y_def = x->cos(pi * x[1])
+# And now we can make our surface.
+surf = UNSflow.EquationSurf(x_def, y_def, z_def)
+# To export it we need to discretise it. We'll turn it into some
+# BilinearQuad elements. We'll use a coarser discretisation in the z direction.
+discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
+    collect(-1:0.1:1), collect(-1:0.2:1))
 
-
-# Return map a local coordinate to a point in space
-function evaluate(a::Point3D, local_coord::Vector{T}) where T <: Real
-    @assert(length(position) == 0, "Point3D is zero dimensionsal.")
-    return a.coord
-end
-
-# Return a vector of coordinates the interpolation points of the geometry
-function coords(a::Point3D)
-    return [a.coord]
-end
-
-# Get the number of dimensions that the space operates in (ie, line->1, surf->2)
-function local_dimensions(a::Point3D)
-    return 0
-end
-
-# Get the number of control points of an object
-function number_of_control_points(a::Point3D)
-    return 1
-end
-
-# Test if a point is in the bounds defined by the object
-function in_bounds(a::Point3D, position::Vector{T}) where T <: Real
-    @assert(length(position) == 0, "Point3D is zero dimensionsal.")
-    return true
-end
+# ... And now we can save it to a file:
+points, cells = UNSflow.to_VtkMesh(discrete_surf)
+vtkfile = WriteVTK.vtk_grid("output/equation_surf_tube", points, cells)
+outfiles = WriteVTK.vtk_save(vtkfile)

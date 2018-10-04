@@ -40,7 +40,7 @@ mutable struct Line2 <: DiscreteGeometry3D
 end
 
 # Return map a local coordinate to a point in space
-function evaluate(a::Line2, local_coord::Vector{Real})
+function evaluate(a::Line2, local_coord::Vector{T}) where T <: Real
     @assert(length(position) == 1, "Line2 is one dimensionsal.")
     return 0.5 * (a.start_coord * (local_coord[1] - 1) +
         a.end_coord * (local_coord[1] + 1))
@@ -62,7 +62,7 @@ function number_of_control_points(a::Line2)
 end
 
 # Test if a point is in the bounds defined by the object
-function in_bounds(a::Line2, position::Vector{Real})
+function in_bounds(a::Line2, position::Vector{T}) where T <: Real
     @assert(length(position) == 1, "Line2 is one dimensionsal.")
     return -1 <= position[1] <= 1
 end

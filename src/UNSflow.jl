@@ -127,6 +127,7 @@ export
     Point3D,
     PolyLine2,
     Vector3D,
+    EquationSurf,
 
     # 3D Vorticity
     Vorticity3D,
@@ -164,9 +165,13 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 include("lowOrder3D/ThreadWork.jl")
 include("lowOrder3D/Vector3D.jl")
 include("lowOrder3D/DiscreteGeometry3D.jl")
+include("lowOrder3D/CoordinateTransform3D.jl")
 include("lowOrder3D/Point3D.jl")
 include("lowOrder3D/Line2.jl")
 include("lowOrder3D/PolyLine2.jl")
+include("lowOrder3D/Spline3D.jl")
+include("lowOrder3D/BilinearQuad.jl")
+include("lowOrder3D/EquationSurf.jl")
 include("lowOrder3D/DiscreteGeometry3DToVTK.jl")
 include("lowOrder3D/Vortex3DRegularisationFunctions.jl")
 include("lowOrder3D/RedistributionScheme.jl")

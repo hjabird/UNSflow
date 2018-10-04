@@ -1,7 +1,7 @@
 #===============================================================================
-    DiscreteGeometry3D.jl
+    BilinearQuad.jl
 
-    Represents a geometry defined by points in 3D cartesian space.
+    Represents a bilinear quad element with local coordinates [-1,1], [-1,1]
 
     Initial code: HJAB 2018
 
@@ -26,38 +26,58 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-mutable struct Point3D <: DiscreteGeometry3D
-    coord :: Vector3D
+mutable struct BilinearQuad <: DiscreteGeometry3D
+    c1 :: Vector3D
+    c2 :: Vector3D
+    c3 :: Vector3D
+    c4 :: Vector3D
 
-    function Point3D(a::Vector3D)
-        new(a)
+    function BilinearQuad(a::Vector{Vector3D})
+        @assert(length(a) == 4, "BilinearQuad is defined by four points")
+        new(a[1], a[2], a[3], a[4])
+    end
+    function BilinearQuad(
+        corner1::Vector3D, corner2::Vector3D,
+        corner3::Vector3D, corner4::Vector3D)
+        new(corner1, corner2, corner3, corner4)
     end
 end
 
-
 # Return map a local coordinate to a point in space
-function evaluate(a::Point3D, local_coord::Vector{T}) where T <: Real
-    @assert(length(position) == 0, "Point3D is zero dimensionsal.")
-    return a.coord
+function evaluate(a::BilinearQuad, local_coord::Vector{T}) where T <: Real
+    @assert(length(position) == 2, "BilinearQuad is two dimensionsal.")
+    x = local_coord[1]
+    y = local_coord[2]
+    t1 = a.c1 * (x-1)(y-1) / 4
+    t2 = - a.c2 * (x+1)(y-1) / 4
+    t3 = a.c3 * (x+1)(y+1) / 4
+    t4 = - a.c4 * (x-1)(y+1) / 4
+    return t1 + t2 + t3 + t4
 end
 
 # Return a vector of coordinates the interpolation points of the geometry
-function coords(a::Point3D)
-    return [a.coord]
+function coords(a::BilinearQuad)
+    return [a.c1, a.c2, a.c3, a.c4]
 end
 
 # Get the number of dimensions that the space operates in (ie, line->1, surf->2)
-function local_dimensions(a::Point3D)
-    return 0
+function local_dimensions(a::BilinearQuad)
+    return 2
 end
 
 # Get the number of control points of an object
-function number_of_control_points(a::Point3D)
-    return 1
+function number_of_control_points(a::BilinearQuad)
+    return 4
 end
 
 # Test if a point is in the bounds defined by the object
-function in_bounds(a::Point3D, position::Vector{T}) where T <: Real
-    @assert(length(position) == 0, "Point3D is zero dimensionsal.")
-    return true
+function in_bounds(a::BilinearQuad, position::Vector{T}) where T <: Real
+    @assert(length(position) == 2, "BilinearQuad is two dimensionsal.")
+    return (-1 <= position[1] <= 1) && (-1 <= position[2] <= 1)
+end
+
+"Make a bilinear quad planar using the normal at it centre."
+function flatten!(a::BilinearQuad)
+
+    return
 end

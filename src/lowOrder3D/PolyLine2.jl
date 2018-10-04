@@ -35,7 +35,7 @@ mutable struct PolyLine2 <: DiscreteGeometry3D
 end
 
 # Return map a local coordinate to a point in space
-function evaluate(a::PolyLine2, local_coord::Vector{Real})
+function evaluate(a::PolyLine2, local_coord::Vector{T}) where T <: Real
     @assert(length(position) == 1, "PolyLine2 is one dimensionsal.")
     lower = floor(local_coord[1])
     upper = ceil(local_coord[1])
@@ -45,7 +45,7 @@ end
 
 # Return a vector of coordinates the interpolation points of the geometry
 function coords(a::PolyLine2)
-    return coords
+    return a.coords
 end
 
 # Get the number of dimensions that the space operates in (ie, line->1, surf->2)
@@ -55,11 +55,11 @@ end
 
 # Get the number of control points of an object
 function number_of_control_points(a::PolyLine2)
-    return length(coords)
+    return length(a.coords)
 end
 
 # Test if a point is in the bounds defined by the object
-function in_bounds(a::PolyLine2, position::Vector{Real})
+function in_bounds(a::PolyLine2, position::Vector{T}) where T <: Real
     @assert(length(position) == 1, "PolyLine2 is one dimensionsal.")
     return 0 <= position[1] <= length(a.coords)
 end

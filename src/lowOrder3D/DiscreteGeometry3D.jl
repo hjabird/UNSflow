@@ -30,7 +30,7 @@ abstract type DiscreteGeometry3D
 end
 
 # Return map a local coordinate to a point in space
-function evaluate(a::DiscreteGeometry3D, local_coord::Vector{Real})
+function evaluate(a::DiscreteGeometry3D, local_coord::Vector{T}) where T <: Real
     error("Not yet implemented for ", typeof(a), ".")
 end
 
@@ -50,6 +50,6 @@ function number_of_control_points(a::DiscreteGeometry3D)
 end
 
 # Test if a point is in the bounds defined by the object
-function in_bounds(a::DiscreteGeometry3D, position::Vector{Real})
+function in_bounds(a::DiscreteGeometry3D, position::Vector{T}) where T <: Real
     error("Not yet implemented for ", typeof(a), ".")
 end

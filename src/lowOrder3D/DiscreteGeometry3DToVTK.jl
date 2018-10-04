@@ -60,17 +60,20 @@
         point_count = map(number_of_control_points, geometry)
         new_points = zeros(3, sum(point_count))
         point_offset = size(filepoints)[2] + 1
+        npoint_offset = 1
         new_cells = Vector{WriteVTK.MeshCell}(undef, length(point_count))
         for i = 1:length(point_count)
             geom = geometry[i]
             new_cell_type = vtk_cell_type(geom)
-            c = coords(geom)
-            for cx in c
-                new_points[:, point_offset] = convert(Vector{Float64}, cx)
-                point_offset += 1
-            end
+            coordinates = coords(geom)
             new_cells[i] = WriteVTK.MeshCell(new_cell_type,
                 Vector{Int64}(point_offset : point_offset + point_count[i] - 1))
+            for coordinate in coordinates
+                new_points[:, npoint_offset] = convert(Vector{Float64},
+                        coordinate)
+                npoint_offset += 1
+                point_offset += 1
+            end
         end
         filepoints = hcat(filepoints, new_points)
         filecells = deepcopy(filecells)
@@ -99,6 +102,9 @@
     end
     function vtk_cell_type(a::PolyLine2)
         return WriteVTK.VTKCellTypes.VTK_POLY_LINE
+    end
+    function vtk_cell_type(a::BilinearQuad)
+        return WriteVTK.VTKCellTypes.VTK_QUAD
     end
 #=catch
     function add_to_VtkMesh()
