@@ -69,7 +69,7 @@
             new_cells[i] = WriteVTK.MeshCell(new_cell_type,
                 Vector{Int64}(point_offset : point_offset + point_count[i] - 1))
             for coordinate in coordinates
-                new_points[:, npoint_offset] = convert(Vector{Float64},
+                new_points[:, npoint_offset] = Base.convert(Vector{Float64},
                         coordinate)
                 npoint_offset += 1
                 point_offset += 1

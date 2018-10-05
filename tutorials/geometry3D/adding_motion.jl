@@ -45,7 +45,7 @@ discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
 # motion. Our first argument, x, is a input Vector3D, and t is the current
 # time.
 trans = UNSflow.CoordinateTransform3D((x,t)->
-                                    UNSflow.rotate_about_z(x, sin(t) * pi/2))
+                            UNSflow.rotate_about_z(x, sin(t) * pi/2 * x.z))
 # Define a dt and create a complete cycle of oscillation, outputting the results
 # to a VTK file.
 nsteps = 200
