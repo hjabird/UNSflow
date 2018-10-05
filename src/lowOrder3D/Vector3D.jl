@@ -52,16 +52,57 @@ mutable struct Vector3D
     end
 end
 
-""" Convert type Vector3D to Array{Float64}"""
-function convert(::Type{Array{T, 1}}, a::Vector3D) where T <: Real
+function Base.convert(::Type{Vector{T}}, a::Vector3D) where T <: Real
     return [a.x, a.y, a.z]
 end
 
-""" Convert type Array{Real} to Vector3D"""
-function convert(::Type{Vector3D}, a::Array{T, 1}) where T<: Real
+function Base.convert(::Type{Vector3D}, a::Array{T, 1}) where T<: Real
     @assert(size(a)[1] == 3)
     b = Vector3D(a[1], a[2], a[3])
     return b
+end
+
+function Base.convert(::Type{Vector{T}}, a::Vector{Vector3D}) where T <: Real
+    arr = Array{T, 1}(undef, 3*length(a))
+    for i = 1:length(a)
+        arr[i*3 - 2] = a[i].x
+        arr[i*3 - 1] = a[i].y
+        arr[i*3 - 0] = a[i].z
+    end
+    return arr
+end
+
+function Base.convert(::Type{Vector{Vector3D}}, a::Array{T, 1}) where T <: Real
+    @assert(length(a) % 3 == 0, string("Conversion of Array{T<:Real,1} to"*
+        " Array{UNSflow.Vector3D} requires that the array's length be a "*
+        " multiple of 3. Length was ", length(a)))
+    arr = Vector{Vector3D}(undef, length(a)/3)
+    for i = 1:length(arr)
+        arr[i].x = arr[i*3 - 2]
+        arr[i].y = arr[i*3 - 1]
+        arr[i].z = arr[i*3 - 0]
+    end
+    return arr
+end
+
+function Base.convert(::Type{Matrix{T}}, a::Vector{Vector3D}) where T <: Real
+    arr = Matrix{T}(undef, (3, length(a)))
+    for i = 1:length(a)
+        arr[:, i] = [a[i].x, a[i].y, a[i].z]
+    end
+    return arr
+end
+
+function Base.convert(::Type{Vector{Vector3D}}, a::Matrix{T}) where T <: Real
+    @assert(size(a)[1] == 3, string("Expected size(a::Matrix)[1] to be equal "*
+        " 3. size(a::Matrix) = ", size(a), size(a)[2] == 3 ? ". The second "*
+        "dimension == 3. To transpose the matrix, use the apostrophe (')"*
+        " operator." : "."))
+    arr = Vector{Vector3D}(undef, size(a)[2])
+    for i = 1:length(arr)
+        arr[i] = convert(Vector3D, a[:, i])
+    end
+    return arr
 end
 
 function Base.:+(a::Vector3D, b::Vector3D)
