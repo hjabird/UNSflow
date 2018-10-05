@@ -1,7 +1,7 @@
 #===============================================================================
-    Line2.jl
+    BilinearInterpolant.jl
 
-    Represents a linear line in cartesian space
+    Represents a linear interpolation of two values in [-1,1]
 
     Initial code: HJAB 2018
 
@@ -26,43 +26,37 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-mutable struct Line2 <: DiscreteGeometry3D
-    start_coord :: Vector3D
-    end_coord :: Vector3D
+mutable struct BilinearInterpolant
 
-    function Line2(a::Vector{Vector3D})
-        @assert(length(a) == 2, "Line2 is defined by two points")
-        new(a[1], a[2])
+    function evaluate(
+        a::LinearInterpolant,
+        vals::Vector{T},
+        local_coord::Vector{S}) where {T <: Any, S <: Real}
+
+        @assert(length(local_coord) == 2, string("BilinearInterpolant is 2"*
+            " dimensionsal. Argument local_coord was ", length(local_coord),
+            " long."))
+        @assert(length(vals) == 4, string("BilinearInterpolant is defined "*
+            "by 2 points. Argument vals was ", length(vals), "long."))
+        return 0.5 * (vals[1] * (local_coord[1] - 1) +
+            vals[2] * (local_coord[1] + 1))
     end
-    function Line2(start::Vector3D, ending::Vector3D)
-        new(start, ending)
+
+    # Get the number of dimensions that the space operates in (ie, line->1, surf->2)
+    function local_dimensions()
+        return 2
     end
-end
 
-# Return map a local coordinate to a point in space
-function evaluate(a::Line2, local_coord::Vector{T}) where T <: Real
-    @assert(length(local_coord) == 1, "Line2 is one dimensionsal.")
-    return 0.5 * (a.start_coord * (local_coord[1] - 1) +
-        a.end_coord * (local_coord[1] + 1))
-end
+    # Get the number of control points of an object
+    function number_of_control_points()
+        return 4
+    end
 
-# Return a vector of coordinates the interpolation points of the geometry
-function coords(a::Line2)
-    return [a.start_coord, a.end_coord]
-end
-
-# Get the number of dimensions that the space operates in (ie, line->1, surf->2)
-function local_dimensions(a::Line2)
-    return 1
-end
-
-# Get the number of control points of an object
-function number_of_control_points(a::Line2)
-    return 2
-end
-
-# Test if a point is in the bounds defined by the object
-function in_bounds(a::Line2, position::Vector{T}) where T <: Real
-    @assert(length(position) == 1, "Line2 is one dimensionsal.")
-    return -1 <= position[1] <= 1
+    # Test if a point is in the bounds defined by the object
+    function in_bounds(position::Vector{T}) where T <: Real
+        @assert(length(local_coord) == 2, string("BilinearInterpolant is 2"*
+            " dimensionsal. Argument local_coord was ", length(local_coord),
+            " long."))
+        return -1 <= position[1] <= 1
+    end
 end
