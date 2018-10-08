@@ -26,37 +26,39 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-mutable struct LinearInterpolant
-    # Return map a local coordinate to a point in space
-    function evaluate(
-        a::LinearInterpolant,
-        vals::Vector{T},
-        local_coord::Vector{S}) where {T <: Any, S <: Real}
+struct LinearInterpolant
+end
 
-        @assert(length(local_coord) == 1, string("LinearInterpolant is 1"*
-            " dimensionsal. Argument local_coord was ", length(local_coord),
-            " long."))
-        @assert(length(vals) == 1, string("LinearInterpolant is defined by"*
-            " 2 points. Argument vals was ", length(vals), "long."))
-        return 0.5 * (vals[1] * (local_coord[1] - 1) +
-            vals[2] * (local_coord[1] + 1))
-    end
+function evaluate(
+    Type{::LinearInterpolant},
+    vals::Vector{T},
+    local_coord::Vector{S}) where {T <: Any, S <: Real}
 
-    # Get the number of dimensions that the space operates in (ie, line->1, surf->2)
-    function local_dimensions()
-        return 1
-    end
+    @assert(length(local_coord) == 1, string("LinearInterpolant is 1"*
+        " dimensionsal. Argument local_coord was ", length(local_coord),
+        " long."))
+    @assert(length(vals) == 1, string("LinearInterpolant is defined by"*
+        " 2 points. Argument vals was ", length(vals), "long."))
+    return 0.5 * (vals[1] * (local_coord[1] - 1) +
+        vals[2] * (local_coord[1] + 1))
+end
 
-    # Get the number of control points of an object
-    function number_of_control_points()
-        return 2
-    end
+# Get the number of dimensions that the space operates in (ie, line->1, surf->2)
+function local_dimensions(Type{::LinearInterpolant})
+    return 1
+end
 
-    # Test if a point is in the bounds defined by the object
-    function in_bounds(position::Vector{T}) where T <: Real
-        @assert(length(position) == 1, string("LinearInterpolant is 1"*
-            " dimensionsal. Argument local_coord was ", length(local_coord),
-            " long."))
-        return -1 <= position[1] <= 1
-    end
+# Get the number of control points of an object
+function number_of_control_points(Type{::LinearInterpolant})
+    return 2
+end
+
+# Test if a point is in the bounds defined by the object
+function in_bounds(Type{::LinearInterpolant},
+    position::Vector{T}) where T <: Real
+
+    @assert(length(position) == 1, string("LinearInterpolant is 1"*
+        " dimensionsal. Argument local_coord was ", length(local_coord),
+        " long."))
+    return -1 <= position[1] <= 1
 end

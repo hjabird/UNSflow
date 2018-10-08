@@ -35,25 +35,18 @@ mutable struct VortexRing <: Vorticity3D
         corner4 :: Vector3D,
         strength :: Float64
         )
-        return new(PolyLine2([corner1, corner2, corner3, corner4]), strength)
+        return new(PolyLine2([corner1, corner2, corner3, corner4, corner1]),
+            strength)
+    end
+
+    function VortexRing(quad :: BilinearQuad, strength :: Float64)
+        return new(PolyLine2([quad.c1, quad.c2, quad.c3, quad.c4, quad.c1]),
+            strength)
     end
 end
 
-function VortexRing(
-    corner1 :: Vector3D,
-    corner2 :: Vector3D,
-    corner3 :: Vector3D,
-    corner4 :: Vector3D
-    )
-    return VortexRing(corner1, corner2, corner3, corner4, 0.0)
-end
-
-function VortexRing()
-    c1 = Vector3D()
-    c2 = Vector3D()
-    c3 = Vector3D()
-    c4 = Vector3D()
-    return VortexRing(c1, c2, c3, c4, 0.0)
+function VortexRing(quad :: BilinearQuad)
+    return VortexRing(quad, 1.0)
 end
 
 function convert(

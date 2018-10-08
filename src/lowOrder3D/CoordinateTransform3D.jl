@@ -71,7 +71,7 @@ function evaluate(t::CoordinateTransform3D, x::Vector3D)
     return t(x)
 end
 
-function derivative2(t::CoordinateTransform3D, x::Vector3D)
+function derivative(t::CoordinateTransform3D, x::Vector3D)
     return t.derivative_method(x, t.time)
 end
 

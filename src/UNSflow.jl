@@ -185,6 +185,7 @@ include("lowOrder3D/VortexRing.jl")
 include("lowOrder3D/SplineVortexParticleFilament.jl")
 include("lowOrder3D/VortexParticleFilamentAdaptive.jl")
 include("lowOrder3D/VortexParticleVolumeAdaptive.jl")
+include("lowOrder3D/Lautat3D2.jl")
 
 # 2D plotting functions
 include("plots/plots2D.jl")

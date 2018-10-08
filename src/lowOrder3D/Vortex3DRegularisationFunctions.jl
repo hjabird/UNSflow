@@ -91,7 +91,7 @@ function threed_planetary_kernels()
     function vortex_g_planetary(rho::Real)
         return (min(1, rho)) ^ 3
     end
-    function vortex_G_singularity(rho::Real)
+    function vortex_G_planetary(rho::Real)
         error("Not yet implemented. Please consider contributing this.")
     end
     function vortex_zeta_planetary(rho::Real)
