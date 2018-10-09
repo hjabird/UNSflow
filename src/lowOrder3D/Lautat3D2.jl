@@ -71,6 +71,22 @@ function discretise_wing_to_geometry!(a::Lautat3D)
     return
 end
 
+function vorticity_densities(::Type{Lautat3D}, ref_vel::Float64
+    x_pos::Float64, coeffs::Vector{Float64})
+
+    @assert(length(coeffs > 0))
+    @assert(-1 <= x_pos <= 1)
+
+    theta = acos(-x_pos)
+    mult = 2 * ref_vel
+    ret = Vector{Float64}(undef, length(coeffs))
+    ret[1] = mult * coeffs[i] * (1 + cos(theta)) / sin(theta)
+    for i = 1 : length(coeffs)
+        ret[i] = mult * coeffs[i] * sin((i-1)*theta)
+    end
+    return ret
+end
+
 function generate_wing_aero_lattice_from_geometry!(a::Lautat3D)
     ns = length(a.extended_strip_centers)
     @assert(ns - 1 == length(a.wing_geometry), string("Expected Lautat3D",
@@ -138,10 +154,10 @@ function generate_eval_points_data!(a::Lautat3D)
 end
 
 function fourier_coefficients_to_vector(a::Lautat3D)
-    b :: Vector{Float64}(undef, a.num_fourier_coeffs * length(a.strip_centres))
+    b = Vector{Float64}(undef, a.num_fourier_coeffs * length(a.strip_centres))
     @assert(length(a.strip_fourier_coeffs) == length(a.strip_centres),
      "length(strip_fourier_coeffs) != length(strip_centres).")
-    for i = 1 : length(strip_centres)
+    for i = 1 : length(a.strip_centres)
         @assert(length(a.strip_fourier_coeffs[i]) == a.num_fourier_coeffs,
             string("Found incorrect number of fourier coefficents: ",
             "length(strip_fourier_coeffs[i]) == a.num_fourier_coeffs." ))
@@ -149,4 +165,86 @@ function fourier_coefficients_to_vector(a::Lautat3D)
             a.strip_fourier_coeffs[i]
     end
     return b
+end
+
+function vector_to_fourier_coefficients!(
+    a::Lautat3D, v::Vector{T}) where T <: Real
+
+    @assert(length(v) == a.num_fourier_coeffs * length(a.strip_centres),
+        string("Expected length of vector v to match n_fourier_coeffs *",
+            "number of strips. length(v) was ", length(v), ", n_fourier_coeffs",
+            " was ", a.num_fourier_coeffs, " and number of strips was ",
+            length(a.strips_centres)))
+    if any(isnan.(v)) @warn "NaN found in input vector!" end
+
+    for i = 1 : length(a.strip_centres)
+        a.strip_fourier_coeffs[i] =
+            v[(i-1) * a.num_fourier_coeffs + 1 : i * a.num_fourier_coeffs]
+    end
+    return
+end
+
+function compute_fourier_self_influence_matrix(a::Lautat3D)
+    @assert(length(a.wing_aero_discretisation) + 1==
+        length(a.extended_strip_centers), string("Length of the ",
+        "aero discretisation does not correspond to the strip discretisation.",
+        " length(extended_strip_centres) - 1 != length(wing_aero_discretisat",
+        "ion). They are ", length(a.extended_strip_centers) - 1, " and ",
+        length(a.wing_aero_discretisation), " respectively."))
+
+    stride = length(a.strip_eval_points[0])
+    len = ength(a.strip_eval_points) * length(a.strip_eval_points[0])
+    big_mes_pnt_vec = Vector{Vector3D}(undef, len)
+    big_normal_vec = Vector{Vector3D}(undef, len)
+    for i = 1 : ength(a.strip_eval_points)
+        big_mes_pnt_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_points[i]
+        big_normal_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_normals[i]
+    end
+    point_influences = map(
+        x->vorticity_vector_velocity_influence(a.wing_aero_discretisation, x),
+        big_mes_pnt_vec )
+    # Take the component in the normal direction.
+    normal_influence = map(
+        x->dot(x[1], x[2]), zip(point_influences, )
+    )
+    @warn "UNFINISHED HERE!!!!"
+end
+
+function ring_vorticities_from_fourier_terms!(a::Luatat3D,
+    strip_idx::Int, fourier_id::Int64)
+    @assert(all(length.(a.strip_fourier_coeffs)) == a.num_fourier_coeffs,
+        string("Fourier coefficient vector lengths were wrong. Expected",
+        " lengths of num_fourier_coeffs = ", a.num_fourier_coeffs, " but ",
+        "found  ", length.(a.strip_fourier_coeffs)))
+    # The return type maps to the a.wing_aero_discretisation container.
+    ret = Vector{Vector{Float64}}(undef, length(a.wing_aero_discretisation))
+
+    @warn "UNFINISHED HERE!!!"
+    for i = 1 : length(a.wing_aero_discretisation)
+        #indexes of above and below strips.
+        strip_pos = i / (2 * a.strip_divisions) + 0.5
+        strip_upper = Int64(ceil(strip_pos))
+        strip_lower = Int64(floor(strip_pos))
+        strip_upper = strip_upper>a.strip_divisions ? strip_lower:strip_upper
+        strip_lower = strip_lower == 0 ? 1:strip_lower
+        for j = 1 : length(a.strip_discretisation) - 1
+            vring  = a.wing_aero_discretisation[i][j]
+            # Backward difference (appart from the first) to get foil tangent
+            jp, cp = j > 1 ? (j-1, 1) : (j+1, -1)
+            fyp_tangent = cp * unit(strip_eval_points[strip_upper][j] -
+                a.strip_eval_points[strip_upper][jp])
+            fym_tangent = cp * unit(strip_eval_points[strip_lower][j] -
+                a.strip_eval_points[strip_lower][jp])
+            # Foil plane normals y-plus, y-minus (fpnyp, fpnym)
+            fpnyp = cross(fyp_tangent, a.strip_eval_normals[strip_upper][j])
+            fpnym = cross(fyp_tangent, a.strip_eval_normals[strip_lower][j])
+            # Generate a weighed of these normals according to the strip_pos
+            fpnave = unit(unit(fpnyp) + unit(fpnym))
+            # Average LE and TE filament directions on ring:
+            spanwise_dir = unit(unit(vring.c3 - vring.c2) +
+                                                    unit(vring.c1 - vring.c4))
+
+
+        end
+    end
 end

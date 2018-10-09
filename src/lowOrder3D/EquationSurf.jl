@@ -90,7 +90,10 @@ function evaluate(
             ", [-1,1]). Value of argument for local coord given: ",
             local_coord))
     end
-    return a.surf_eq(local_coord)
+    ret_val = a.surf_eq(local_coord)
+    if any(isnan.(ret_val)) @warn "Encountered NaN whilst evaluating"*
+            " EquationSurf" end
+    return ret_val
 end
 
 # Get the number of dimensions that the space operates in (ie, line->1, surf->2)

@@ -43,6 +43,10 @@ mutable struct Spline3D
         @assert((length(ts) == length(xs)) && (length(ys) == length(zs)) &&
             (length(xs) == length(ys)),
             "All input vectors must be of the same length.")
+        if any(isnan.(xs)) @warn "NaN in xs vector given to Spline3D." end
+        if any(isnan.(ys)) @warn "NaN in ys vector given to Spline3D." end
+        if any(isnan.(zs)) @warn "NaN in zs vector given to Spline3D." end
+        if any(isnan.(ts)) @warn "NaN in ts vector given to Spline3D." end
         sx = Dierckx.Spline1D(ts, xs, k=3, bc="error")
         sy = Dierckx.Spline1D(ts, ys, k=3, bc="error")
         sz = Dierckx.Spline1D(ts, zs, k=3, bc="error")
