@@ -53,3 +53,8 @@ end
 function in_bounds(a::DiscreteGeometry3D, position::Vector{T}) where T <: Real
     error("Not yet implemented for ", typeof(a), ".")
 end
+
+function centre(a::DiscreteGeometry3D)
+    c = coords(a)
+    return sum(c) / length(c)
+end

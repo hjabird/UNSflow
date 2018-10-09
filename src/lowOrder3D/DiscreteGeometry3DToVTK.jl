@@ -81,6 +81,14 @@
         return filepoints, filecells
     end
 
+    function add_to_VtkMesh(
+        filepoints :: Matrix{Float64},
+        filecells :: Vector{WriteVTK.MeshCell},
+        geometry :: Matrix{T}
+        ) where T <: DiscreteGeometry3D
+        return add_to_VtkMesh(filepoints, filecells, vec(geometry))
+    end
+
     function to_VtkMesh(
         geometry :: Vector{T}
         ) where T <: DiscreteGeometry3D
@@ -89,6 +97,12 @@
         filecells = Vector{WriteVTK.MeshCell}(undef, 0)
         filepoints, filecells = add_to_VtkMesh(filepoints, filecells, geometry)
         return filepoints, filecells
+    end
+
+    function to_VtkMesh(
+        geometry :: Matrix{T}
+        ) where T <: DiscreteGeometry3D
+        return to_VtkMesh(vec(geometry))
     end
 
     function vtk_cell_type(a::DiscreteGeometry3D)

@@ -56,7 +56,7 @@ function Base.convert(::Type{Vector{T}}, a::Vector3D) where T <: Real
     return [a.x, a.y, a.z]
 end
 
-function Base.convert(::Type{Vector3D}, a::Array{T, 1}) where T<: Real
+function Base.convert(::Type{Vector3D}, a::Vector{T}) where T<: Real
     @assert(size(a)[1] == 3)
     b = Vector3D(a[1], a[2], a[3])
     return b

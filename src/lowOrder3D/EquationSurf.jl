@@ -174,16 +174,15 @@ function discretise(
     @assert(issorted(ygrid) || issorted(ygrid, rev=true), "ygrid must be"*
         " sorted.")
 
-    n_output = Vector{BilinearQuad}(undef, (length(xgrid)-1) *
+    n_output = Matrix{BilinearQuad}(undef, (length(xgrid) - 1),
         (length(ygrid) - 1))
     for i = 1 : length(xgrid) - 1
         for j = 1 : length(ygrid) - 1
-            idx = (i-1) * (length(ygrid)-1) + j
             c1 = evaluate(a, [xgrid[i], ygrid[j]])
             c2 = evaluate(a, [xgrid[i+1], ygrid[j]])
             c3 = evaluate(a, [xgrid[i+1], ygrid[j+1]])
             c4 = evaluate(a, [xgrid[i], ygrid[j+1]])
-            n_output[idx] = BilinearQuad(c1, c2, c3, c4)
+            n_output[i, j] = BilinearQuad(c1, c2, c3, c4)
         end
     end
     for child in n_output

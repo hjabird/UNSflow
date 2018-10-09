@@ -71,7 +71,7 @@ function discretise_wing_to_geometry!(a::Lautat3D)
     return
 end
 
-function vorticity_densities(::Type{Lautat3D}, ref_vel::Float64
+function vorticity_densities(::Type{Lautat3D}, ref_vel::Float64,
     x_pos::Float64, coeffs::Vector{Float64})
 
     @assert(length(coeffs > 0))
@@ -210,7 +210,7 @@ function compute_fourier_self_influence_matrix(a::Lautat3D)
     @warn "UNFINISHED HERE!!!!"
 end
 
-function ring_vorticities_from_fourier_terms!(a::Luatat3D,
+function ring_vorticities_from_fourier_terms!(a::Lautat3D,
     strip_idx::Int, fourier_id::Int64)
     @assert(all(length.(a.strip_fourier_coeffs)) == a.num_fourier_coeffs,
         string("Fourier coefficient vector lengths were wrong. Expected",
@@ -225,8 +225,8 @@ function ring_vorticities_from_fourier_terms!(a::Luatat3D,
         strip_pos = i / (2 * a.strip_divisions) + 0.5
         strip_upper = Int64(ceil(strip_pos))
         strip_lower = Int64(floor(strip_pos))
-        strip_upper = strip_upper>a.strip_divisions ? strip_lower:strip_upper
-        strip_lower = strip_lower == 0 ? 1:strip_lower
+        strip_upper = strip_upper>a.strip_divisions ? strip_lower : strip_upper
+        strip_lower = strip_lower == 0 ? 1 : strip_lower
         for j = 1 : length(a.strip_discretisation) - 1
             vring  = a.wing_aero_discretisation[i][j]
             # Backward difference (appart from the first) to get foil tangent

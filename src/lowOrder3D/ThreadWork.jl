@@ -109,6 +109,6 @@ function apply_to_tree(func::Function, root::Any, iterable_supertype)
         startstate = ThreadState([ThreadWorkload(root)])
         ts[i] = startstate
     end
-    @time ccall(:jl_threading_run, Ref{Cvoid}, (Any,), worker_func)
+    ccall(:jl_threading_run, Ref{Cvoid}, (Any,), worker_func)
     return
 end

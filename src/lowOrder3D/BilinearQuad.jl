@@ -75,9 +75,3 @@ function in_bounds(a::BilinearQuad, position::Vector{T}) where T <: Real
     @assert(length(position) == 2, "BilinearQuad is two dimensionsal.")
     return (-1 <= position[1] <= 1) && (-1 <= position[2] <= 1)
 end
-
-"Make a bilinear quad planar using the normal at it centre."
-function flatten!(a::BilinearQuad)
-
-    return
-end

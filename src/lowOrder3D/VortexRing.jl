@@ -66,6 +66,14 @@ function centre(ring::VortexRing)
     return (coords[1] + coords[2] + coords[3] + coords[4]) / 4
 end
 
+function normal(ring::VortexRing)
+    g = ring.geometry.coords
+    t1 = 0.25 * (g[4] + g[3] - g[2] - g[1])
+    t2 = 0.25 * (g[2] + g[3] - g[1] - g[4])
+    n = unit(cross(t1, t2))
+    return n
+end
+
 function effective_radius(ring::VortexRing)
     c = centre(ring)
     coords = ring.goemetry.coords
