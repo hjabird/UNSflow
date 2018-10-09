@@ -227,6 +227,22 @@ function Base.size(a::Vector3D)
     return [3]
 end
 
+function Base.length(a::Vector3D)
+    return 3
+end
+
+function Base.iterate(a::Vector3D, state=(a, 1))
+    element, count = state
+    if count > 3
+        return nothing
+    end
+    return (a[count], (a, count + 1))
+end
+
+function Base.eltype(::Type{Tuple{Vector3D, T}}) where T <: Int
+    return Float64
+end
+
 function outer(a::Vector3D, b::Vector3D)
     return [
         a.x*b.x a.x*b.y a.x*b.z;
