@@ -72,7 +72,7 @@ function discretise_wing_to_geometry!(a::Lautat3D)
 end
 
 function vorticity_densities(::Type{Lautat3D}, ref_vel::Float64,
-    x_pos::Float64, coeffs::Vector{Float64})
+    x_pos::S, coeffs::Vector{T}) where {S <: Real, T <: Real}
 
     @assert(length(coeffs > 0))
     @assert(-1 <= x_pos <= 1)
@@ -85,6 +85,13 @@ function vorticity_densities(::Type{Lautat3D}, ref_vel::Float64,
         ret[i] = mult * coeffs[i] * sin((i-1)*theta)
     end
     return ret
+end
+
+function vorticity_density_derivatives(::Type{Lautat3D}, ref_vel::Float64,
+    x_pos::S, coeffs::Vector{T}) where {S <: Real, T <: Real}
+
+    reduced_fn = x->vorticity_densities(Lautat3D, ref_vel, x, coeffs)
+    return ForwardDiff.derivative(reduced_fn, x_pos)
 end
 
 function generate_wing_aero_lattice_from_geometry!(a::Lautat3D)
@@ -184,49 +191,30 @@ function vector_to_fourier_coefficients!(
     return
 end
 
-function compute_fourier_self_influence_matrix(a::Lautat3D)
-    @assert(length(a.wing_aero_discretisation) + 1==
-        length(a.extended_strip_centers), string("Length of the ",
-        "aero discretisation does not correspond to the strip discretisation.",
-        " length(extended_strip_centres) - 1 != length(wing_aero_discretisat",
-        "ion). They are ", length(a.extended_strip_centers) - 1, " and ",
-        length(a.wing_aero_discretisation), " respectively."))
-
-    stride = length(a.strip_eval_points[0])
-    len = ength(a.strip_eval_points) * length(a.strip_eval_points[0])
-    big_mes_pnt_vec = Vector{Vector3D}(undef, len)
-    big_normal_vec = Vector{Vector3D}(undef, len)
-    for i = 1 : ength(a.strip_eval_points)
-        big_mes_pnt_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_points[i]
-        big_normal_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_normals[i]
+function get_low_and_high(a::Lautat3D, idx::Int, tipex::Bool=false)
+    strip_pos = idx / (2 * a.strip_divisions) + 0.5
+    strip_upper = Int64(ceil(strip_pos))
+    strip_lower = Int64(floor(strip_pos))
+    if tipex
+        strip_upper = strip_upper > a.strip_divisions ?
+            -1 : strip_upper
+        strip_lower = strip_lower == 0 ? -1 : strip_lower
+    else
+        strip_upper = strip_upper > a.strip_divisions ?
+            strip_lower : strip_upper
+        strip_lower = strip_lower == 0 ? 1 : strip_lower
     end
-    point_influences = map(
-        x->vorticity_vector_velocity_influence(a.wing_aero_discretisation, x),
-        big_mes_pnt_vec )
-    # Take the component in the normal direction.
-    normal_influence = map(
-        x->dot(x[1], x[2]), zip(point_influences, )
-    )
-    @warn "UNFINISHED HERE!!!!"
+    return (strip_lower, strip_upper, strip_pos % 1)
 end
 
-function ring_vorticities_from_fourier_terms!(a::Lautat3D,
-    strip_idx::Int, fourier_id::Int64)
-    @assert(all(length.(a.strip_fourier_coeffs)) == a.num_fourier_coeffs,
-        string("Fourier coefficient vector lengths were wrong. Expected",
-        " lengths of num_fourier_coeffs = ", a.num_fourier_coeffs, " but ",
-        "found  ", length.(a.strip_fourier_coeffs)))
+function ring_slant_corrections(a::Lautat3D)
     # The return type maps to the a.wing_aero_discretisation container.
     ret = Vector{Vector{Float64}}(undef, length(a.wing_aero_discretisation))
 
-    @warn "UNFINISHED HERE!!!"
     for i = 1 : length(a.wing_aero_discretisation)
+        ret[i] = zeros(length(a.strip_discretisation) - 1)
         #indexes of above and below strips.
-        strip_pos = i / (2 * a.strip_divisions) + 0.5
-        strip_upper = Int64(ceil(strip_pos))
-        strip_lower = Int64(floor(strip_pos))
-        strip_upper = strip_upper>a.strip_divisions ? strip_lower : strip_upper
-        strip_lower = strip_lower == 0 ? 1 : strip_lower
+        strip_upper, strip_lower, relpos = get_low_and_high(a, i)
         for j = 1 : length(a.strip_discretisation) - 1
             vring  = a.wing_aero_discretisation[i][j]
             # Backward difference (appart from the first) to get foil tangent
@@ -239,12 +227,160 @@ function ring_vorticities_from_fourier_terms!(a::Lautat3D,
             fpnyp = cross(fyp_tangent, a.strip_eval_normals[strip_upper][j])
             fpnym = cross(fyp_tangent, a.strip_eval_normals[strip_lower][j])
             # Generate a weighed of these normals according to the strip_pos
-            fpnave = unit(unit(fpnyp) + unit(fpnym))
+            fpnave = unit(relpos * unit(fpnyp) + (1 - relpos) * unit(fpnym))
             # Average LE and TE filament directions on ring:
             spanwise_dir = unit(unit(vring.c3 - vring.c2) +
                                                     unit(vring.c1 - vring.c4))
-
-
+            ret[i][j] = 1 / dot(spanwise_dir, fpnave)
+            if !isfinite(ret[i][j] ) @warn "Non-finite slant correction!" end
         end
     end
+end
+
+
+# The interaction matrix is controlled by a vector of ring vorticities.
+# We need to generate the vector of ring vorticities from a vector of
+# fourier terms. This is done via a transformation matrix.
+function ring_vorticity_fourier_transformation_matrix(a::Lautat3D)
+    # We have to contend with:
+        # 1: Getting the value for the ring vorticity itself
+        # 2: Correcting for the slant of the ring
+        # 3: Interpolating between the strips on which we're doing the analysis.
+    # Data structures should have a 1:1 index based mapping to the aero
+    # discretisation.
+    slant_corrections = ring_slant_corrections(a)
+
+    centres_on_strips = a.strip_discretisation[1:end-1] +
+        a.strip_discretisation[2:end]
+    fourier_ones = ones(a.num_fourier_coeffs)
+    # We get the strength due to each coefficient separately so Vector{Vector}
+    generic_ring_strengths = map(
+        x->vorticity_density_derivatives(Lautat3D, ref_vel, x, fourier_ones),
+        centres_on_strips   )
+
+    # We need an N_RINGS * N_FOURIER_HANDLES size matrix.
+    n_per_strip = length(centres_on_strips)
+    transform_matrix = zeros(n_per_strip * 2 * strip_divisions *
+        length(a.strip_centres), length(a.strip_centres) * a.num_fourier_coeffs)
+
+    for i = 1 : length(a.wing_aero_discretisation)
+        strip_lower, strip_upper, relpos = get_low_and_high(a, i, true)
+        for j = 1 : n_per_strip
+            # The transform for a single ring is one row of the matrix.
+            idx_ring = j + (i-1)*n_per_strip
+            idxrange_fupper = collect(a.num_fourier_coeffs*(strip_upper-1)+1 :
+                a.num_fourier_coeffs*strip_upper)
+            idxrange_flower = collect(a.num_fourier_coeffs*(strip_lower-1)+1 :
+                a.num_fourier_coeffs*strip_lower)
+            if strip_upper != -1
+            transform_matrix[idx_ring, idxrange_fupper] +=
+                generic_ring_strengths[j] .* slant_corrections[i][j] .* relpos
+            end
+            if strip_lower != -1
+            transform_matrix[idx_ring, idxrange_flower] +=
+                generic_ring_strengths[j] .*slant_corrections[i][j] .*(1-relpos)
+            end
+        end
+    end
+    return transform_matrix
+end
+
+# A matrix/vector of normal velocities induced on a surface must be converted
+# to fourier coefficients via some kind of matrix. This will produce said
+# matrix.
+function induced_normal_velocity_to_fourier_transformation_matrix(
+    a::Luatat3D, ref_vel :: Float64)
+
+    eval_xs = (a.strip_discretisation[1:end-1]
+        + a.strip_discretisation[2:end])/2
+    eval_thetas = acos.(-eval_xs)
+    eval_dthetas = acos.(-a.strip_discretisation[2:end]) .-
+        acos.(-a.strip_discretisation[1:end-1])
+
+    ret = zeros(length(a.strip_centres) * a.num_fourier_coeffs, length(eval_xs))
+
+    for i = 1:size(ret, 1)
+        j = i % a.num_fourier_coeffs
+        c_terms = cos.(j .* eval_thetas)
+        ret[i, :] = c_terms .* eval_dthetas .* (2   / (pi * ref_vel))
+        if j == 0
+            ret[i, :] = ret[i, :] .* -0.5
+        end
+    end
+
+    return ret
+end
+
+# Compute the wing induced normal velocities matrix
+function self_normal_velocity_influence_matrix(a::Lautat3D)
+    @assert(length(a.wing_aero_discretisation) + 1 ==
+        length(a.extended_strip_centers), string("Length of the ",
+        "aero discretisation does not correspond to the strip discretisation.",
+        " length(extended_strip_centres) - 1 != length(wing_aero_discretisat",
+        "ion). They are ", length(a.extended_strip_centers) - 1, " and ",
+        length(a.wing_aero_discretisation), " respectively."))
+
+    # FIRST construct a big vector of the measurement points and normals...
+    stride = length(a.strip_eval_points[0])
+    len = length(a.strip_eval_points) * length(a.strip_eval_points[0])
+    big_mes_pnt_vec = Vector{Vector3D}(undef, len)
+    big_normal_vec = Vector{Vector3D}(undef, len)
+    for i = 1 : length(a.strip_eval_points)
+        big_mes_pnt_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_points[i]
+        big_normal_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_normals[i]
+    end
+    # So that we can the map this to the influence function...
+    point_influences = map(
+        x->vorticity_vector_velocity_influence(a.wing_aero_discretisation, x),
+        big_mes_pnt_vec )
+    # And the take only the influence normal to our surface.
+    normal_influence = map(
+        x->dot(x[1], x[2]), zip(point_influences, big_normal_vec))
+    # Finally, we can turn our Vector{Vector} into a matrix.
+    ret = zeros(length(normal_influence), length(normal_influence[1]))
+    for row in 1 : size(ret, 1)
+        ret[row, :] = normal_influence[i]
+    end
+    return ret
+end
+
+function induced_normal_velocity_influence_vector(
+    a::Luatat3D, inducing_body::Vorticity3D)
+
+    # FIRST construct a big vector of the measurement points and normals...
+    stride = length(a.strip_eval_points[0])
+    len = length(a.strip_eval_points) * length(a.strip_eval_points[0])
+    big_mes_pnt_vec = Vector{Vector3D}(undef, len)
+    big_normal_vec = Vector{Vector3D}(undef, len)
+    for i = 1 : length(a.strip_eval_points)
+        big_mes_pnt_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_points[i]
+        big_normal_vec[(i-1)*stride + 1 : i * stride] = a.strip_eval_normals[i]
+    end
+    # So that we can the map this to the influence function...
+    point_influences = map(
+        x->induced_velocity(inducing_body, x), big_mes_pnt_vec)
+    # And the take only the influence normal to our surface.
+    normal_influence = map(
+        x->dot(x[1], x[2]), zip(point_influences, big_normal_vec))
+    # Finally, we can turn our Vector{Vector} into a matrix.
+    ret = zeros(length(normal_influence), length(normal_influence[1]))
+    for row in 1 : size(ret, 1)
+        ret[row, :] = normal_influence[i]
+    end
+    return ret
+end
+
+function psuedo_two_dimensional_induced_normal_velocity_matrix(a::Luatat3D)
+    # This will be the psuedo 2D effect at each strip. Each strip only
+    # affects itself here, so the matrix is block diagonal. The matrix
+    # is also directly multiplied by the fourier term vector.
+    stride = a.num_fourier_coeffs
+    len = stride * len(a.strip_centres)
+    ret = zeros(len, len)
+    # We will position the 2D vortices where the rings LE and TE vortex fils
+    # are.
+    xps = a.strip_discretisation
+
+
+
 end

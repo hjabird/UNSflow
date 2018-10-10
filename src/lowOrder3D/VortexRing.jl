@@ -49,7 +49,7 @@ function VortexRing(quad :: BilinearQuad)
     return VortexRing(quad, 1.0)
 end
 
-function convert(
+function Base.convert(
     ::Type{Vector{StraightVortexFilament}},
     a::VortexRing)
     b = Vector{StraightVortexFilament}(4)

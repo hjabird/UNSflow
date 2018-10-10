@@ -175,6 +175,20 @@ function dot(a::Vector3D, b::Vector{Real})
     return dot(b, a)
 end
 
+function dot(a::Matrix{T}, b::Vector3D) where T <: Real
+    @assert(size(a, 2) == 3, string("dot(Matrix, Vector3D) expects",
+        " a matrix of size n x 3. The size of the matrix was",
+        size(a), ".")
+    return a * convert(Vector{T}, b)
+end
+
+function dot(a::Vector3D, b::Matrix{T}) where T <: Real
+    @assert(size(a, 1) == 3, string("dot(Matrix, Vector3D) expects",
+        " a matrix of size 3 x n. The size of the matrix was",
+        size(a), ".")
+    return convert(Vector{T}, a) * b
+end
+
 function Base.abs(a::Vector3D)
     return sqrt(a.x^2 + a.y^2 + a.z^2)
 end
@@ -207,7 +221,7 @@ function Base.:(==)(a::Vector3D, b::Vector3D)
     end
 end
 
-function iszero(a::Vector3D)
+function Base.iszero(a::Vector3D)
     if a.x == 0.0 && a.y == 0.0 && a.z == 0.0
         return true
     else
