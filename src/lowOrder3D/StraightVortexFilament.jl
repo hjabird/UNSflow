@@ -52,6 +52,21 @@ StraightVortexFilament() =
         Vector3D([1., 1., 1.]),
         0.0)
 
+function to_particles(a::StraightVortexFilament, radius::Real,
+    kernal::Vortex3DRegularisationFunctions)
+
+    vec = a.geometry.end_coord - a.geometry.start_coord
+    len = abs(vec)
+    np = ceil(1.3 * len / (radius * 2))
+    relative_div = len / np
+    pos = map(
+        x->a.geometry.start_coord + x * vec,
+        relative_div .* collect(0.5 : 0.5 + np))
+    vort = vec * a.vorticity / np
+    ret = map(x->VortexParticle3D(x, vort, relative_div / 2, kernal), pos)
+    return Vorticity3DSimpleCollector(ret)
+end
+
 function centre(filament::StraightVortexFilament)
     return (filament.geometry.start_coord + filament.geometry.end_coord) / 2
 end

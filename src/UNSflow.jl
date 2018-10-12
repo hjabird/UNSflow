@@ -22,6 +22,8 @@ import SpecialFunctions: erf
 
 import LaTeXStrings: @L_str
 
+import LinearAlgebra
+
 export
     # kinematics types and funtions
     MotionDef,

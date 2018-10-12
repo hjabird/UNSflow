@@ -178,14 +178,14 @@ end
 function dot(a::Matrix{T}, b::Vector3D) where T <: Real
     @assert(size(a, 2) == 3, string("dot(Matrix, Vector3D) expects",
         " a matrix of size n x 3. The size of the matrix was",
-        size(a), ".")
+        size(a), "."))
     return a * convert(Vector{T}, b)
 end
 
 function dot(a::Vector3D, b::Matrix{T}) where T <: Real
     @assert(size(a, 1) == 3, string("dot(Matrix, Vector3D) expects",
         " a matrix of size 3 x n. The size of the matrix was",
-        size(a), ".")
+        size(a), "."))
     return convert(Vector{T}, a) * b
 end
 
