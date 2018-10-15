@@ -174,13 +174,52 @@ function state_vector_length(a::Vorticity3DCollector)
     return mapreduce(state_vector_length, +, this.children, init=0)
 end
 
+function state_vector(a::Vorticity3DCollector)
+    sv = Vector{Float64}()
+    for child in this.children
+        append!(sv, state_vector(child))
+    end
+    return sv
+end
+
+function update_using_state_vector!(
+    this::Vorticity3DCollector,
+    state_vect::Vector{Float64})
+
+    lens = map(state_vector_length, this.children)
+    @assert(mapreduce(x, +, lens, init=0) == length(state_vect), string(
+        "Input state vector was the incorrect length. Length was ",
+        length(state_vect), " but should have been ",
+        mapreduce(x, +, lens, init=0), "."))
+
+    offset = 1
+    for i = 1 : length(this.children)        
+        update_using_state_vector(
+            this.children[i],
+            vort_vect[offset : offset + lens[i] - 1])
+        offset += lens[i]
+    end
+    return
+end
+
+function state_time_derivative(
+    this::Vorticity3D,
+    inducing_bodies::Vorticity3D)
+
+    svtd = Vector{Float64}()
+    for child in this.children
+        append!(svtd, state_time_derivative(child, inducing_bodies))
+    end
+    return svtd
+end
+
 function vorticity_vector_length(this::Vorticity3DCollector)
     return mapreduce(vorticity_vector_length, +, this.children, init=0)
 end
 
 function vorticity_vector(this::Vorticity3DCollector)
     v = Vector{Float64}()
-    for child in children
+    for child in this.children
         append!(v, vorticity_vector(child))
     end
     return v
@@ -195,7 +234,7 @@ function update_using_vorticity_vector!(
         "Input vorticity vector was the incorrect length.")
     offset = 1
     for i = 1 : length(this.children)
-        update_using_state_vector(
+        update_using_vorticity_vector(
             this.children[i],
             vort_vect[offset : offset + lens[i] - 1])
         offset += lens[i]

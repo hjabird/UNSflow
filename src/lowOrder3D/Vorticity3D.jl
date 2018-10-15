@@ -103,21 +103,23 @@ function state_vector_length(a::Vorticity3D)
 end
 
 """
-Returns the state vector used for covectin using an ODE solver
+Returns the "state vector" representing the state of the Vorticity3D object
+that might change due to convection.
+
+This is intended for use during the solution of the ODE problem of convection.
+
+Associated useful functions are state_vector_length(::Vorticity3D),
+update_using_state_vector!(::Vorticity3D, state_vector::Vector{Float64})
+and state_vector_time_derivative(this::Vorticity3D, 
+inducing_bodies::Vorticity3D).
 """
 function state_vector(a::Vorticity3D)
-    # We assume here that the change in due only due to convection of points.
-    # Otherwise we need to specially define this such as for VortexParticle3D
-    state_vect = Vector{Float64}()
-    if typeof(a) <: Vorticity3DCollector
-        for child in get_children(a)
-            append!(state_vect, state_vector(child))
-        end
-    else
-        coord_vect = coords(a.geometry)
-        for c in coord_vect
-            append!(state_vect, convert(Vector{Float64}, c))
-        end
+    @assert(a <: Vorticity3DCollector, "The specialised function should have "*
+        "been called here. Check Vorticity3DCollector.jl") 
+    state_vect = Vector{Float64}(undef, state_vector_length(a))
+    coord_vect = coords(a.geometry)
+    for c in coord_vect
+        append!(state_vect, convert(Vector{Float64}, c))
     end
     return state_vect
 end
@@ -129,23 +131,23 @@ using some form of ODE solver.
 function update_using_state_vector!(
     this::Vorticity3D,
     state_vect::Vector{Float64})
-    # We assume here that the change in due only due to convection of points.
-    # Otherwise we need to specially define this such as for VortexParticle3D
-    @assert(typeof(this) != VortexParticle3D)
-    if typeof(this) <: Vorticity3DCollector
-        for child in get_children(this)
-            state_vect = update_using_state_vector!(child, state_vect)
-        end
-    else
-        coord_vect = coords(this.geometry)
-        for i = 1 : length(coord_vect)
-            coord_vect[i].x = state_vect[i * 3 - 2]
-            coord_vect[i].y = state_vect[i * 3 - 1]
-            coord_vect[i].z = state_vect[i * 3]
-        end
-        coord_vect = coord_vect[length(coord_vect) * 3 + 1: end]
+    @assert(typeof(this) != VortexParticle3D, "Wrong function dispatched!?")
+    @assert(!(typeof(this) <: Vorticity3DCollector), 
+        "Wrong function dispatched!?")
+    
+    coord_vect = coords(this.geometry)
+    @assert(length(state_vect) == 3 * length(coord_vect), string(
+        "Input state vector was the incorrect length. Length was ",
+        length(state_vect), " but should have been ",
+        3 * length(coord_vect), ".")
+    ))
+    for i = 1 : length(coord_vect)
+        coord_vect[i].x = state_vect[i * 3 - 2]
+        coord_vect[i].y = state_vect[i * 3 - 1]
+        coord_vect[i].z = state_vect[i * 3]
     end
-    return state_vect
+    coord_vect = coord_vect[length(coord_vect) * 3 + 1: end]
+    return
 end
 
 """
@@ -155,20 +157,14 @@ an inducing Vorticity3D.
 function state_time_derivative(
     this::Vorticity3D,
     inducing_bodies::Vorticity3D)
-    # We assume here that the change in due only due to convection of points.
-    # Otherwise we need to specially define this such as for VortexParticle3D
+
+    @assert(typeof(this) != VortexParticle3D)
+    @assert(!(typeof(this) <: Vorticity3DCollector))
     deriv_vect = Vector{Float64}()
-    if typeof(this) <: Vorticity3DCollector
-        for child in get_children(this)
-            append!(deriv_vect, state_time_derivative(child, inducing_bodies))
-        end
-    else
-        coord_vect = coords(this.geometry)
-        for c in coord_vect
-            append!(deriv_vect,
-                convert(Vector{Float64},
-                    induced_velocity(this, inducing_bodies)))
-        end
+    coord_vect = coords(this.geometry)
+    for c in coord_vect
+        append!(deriv_vect,
+            convert(Vector{Float64}, induced_velocity(this, inducing_bodies)))
     end
     return deriv_vect
 end

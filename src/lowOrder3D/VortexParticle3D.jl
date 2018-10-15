@@ -136,10 +136,12 @@ function update_using_state_vector!(
     this::VortexParticle3D,
     state_vect::Vector{Float64})
 
+    @assert(length(state_vect) == 6, string("Length of state vector for",
+        " a vortex particle should have been 6. Instead it was ",
+        length(state_vect)))
     this.geometry.coord = convert(Vector3D, state_vect[1:3])
     this.vorticity = convert(Vector3D, state_vect[4:6])
-    state_vect = state_vect[7:end]
-    return state_vect
+    return
 end
 
 function state_time_derivative(
