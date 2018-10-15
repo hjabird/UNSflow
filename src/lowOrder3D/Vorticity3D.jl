@@ -139,8 +139,7 @@ function update_using_state_vector!(
     @assert(length(state_vect) == 3 * length(coord_vect), string(
         "Input state vector was the incorrect length. Length was ",
         length(state_vect), " but should have been ",
-        3 * length(coord_vect), ".")
-    ))
+        3 * length(coord_vect), "."))
     for i = 1 : length(coord_vect)
         coord_vect[i].x = state_vect[i * 3 - 2]
         coord_vect[i].y = state_vect[i * 3 - 1]
@@ -220,4 +219,27 @@ function vorticity_vector_velocity_influence(
         "Vorticity3D subtype ", typeof(this),
         ".")
     return
+end
+
+"""
+Generate an matrix describing how the vorticity_vector changes the normal 
+velocity at given points and normals.
+"""
+function normal_velocity_influence_matrix(
+    inducing_body::Vorticity3D, 
+    mes_points::Vector{Vector3D},
+    mes_normals::Vector{Vector3D})
+    @assert(size(mes_normals) == size(mes_points))
+
+    ivs = map(
+        x->vorticity_vector_velocity_influence(inducing_body, x), 
+        mes_points)
+    ins = map(
+        x->dot(x[1], x[2]), zip(ivs, 
+        mes_normals))
+    a = zeros(length(mes_points), vorticiy_vector_length(inducing_body))
+    for i = 1 : length(mes_points)
+        a[i, :] = ins[i]
+    end
+    return a
 end

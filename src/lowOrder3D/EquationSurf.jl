@@ -96,6 +96,13 @@ function evaluate(
     return ret_val
 end
 
+function evaluate(
+    a::EquationSurf,
+    local_coord::Tuple{T, T},
+    boundscheck::Bool=true) where {T <: Real}
+    evaluate(a, [local_coord[1], local_coord[2]], boundscheck)
+end
+
 # Get the number of dimensions that the space operates in (ie, line->1, surf->2)
 function local_dimensions(a::EquationSurf)
     return 2
@@ -163,8 +170,14 @@ end
 
 function discretise(
     a::EquationSurf, ::Type{BilinearQuad},
-    xgrid::Vector{Float64}, ygrid::Vector{Float64})
+    xgrid::Vector{T}, ygrid::Vector{T}) where T <:Real
+    
+    r = discretise(a, BilinearQuadSurf, xgrid, ygrid)
+    return convert(Matrix{BilinearQuad}, r)
+end
 
+function discretise(a::EquationSurf, ::Type{BilinearQuadSurf},
+    xgrid::Vector{T}, ygrid::Vector{T}) where T <:Real
     @assert(all(-1 .<= xgrid .<= 1), "All grid coordinates must be in [-1,1]")
     @assert(all(-1 .<= ygrid .<= 1), "All grid coordinates must be in [-1,1]")
     @assert(length(xgrid) >= 2, "xgrid must have length >= 2")
@@ -174,24 +187,8 @@ function discretise(
     @assert(issorted(ygrid) || issorted(ygrid, rev=true), "ygrid must be"*
         " sorted.")
 
-    n_output = Matrix{BilinearQuad}(undef, (length(xgrid) - 1),
-        (length(ygrid) - 1))
-    for i = 1 : length(xgrid) - 1
-        for j = 1 : length(ygrid) - 1
-            c1 = evaluate(a, [xgrid[i], ygrid[j]])
-            c2 = evaluate(a, [xgrid[i+1], ygrid[j]])
-            c3 = evaluate(a, [xgrid[i+1], ygrid[j+1]])
-            c4 = evaluate(a, [xgrid[i], ygrid[j+1]])
-            n_output[i, j] = BilinearQuad(c1, c2, c3, c4)
-        end
-    end
-    for child in n_output
-        tst = child.c1
-        tst = child.c2
-        tst = child.c3
-        tst = child.c4
-    end
-    return n_output
+    coords = map(x->evaluate(a, x), [[x, y] for x in xgrid, y in ygrid])
+    return BilinearQuadSurf(coords)
 end
 
 function discretise(

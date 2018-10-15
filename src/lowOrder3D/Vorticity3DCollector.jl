@@ -203,7 +203,7 @@ function update_using_state_vector!(
 end
 
 function state_time_derivative(
-    this::Vorticity3D,
+    this::Vorticity3DCollector,
     inducing_bodies::Vorticity3D)
 
     svtd = Vector{Float64}()
