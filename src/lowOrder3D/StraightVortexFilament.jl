@@ -84,45 +84,30 @@ function induced_velocity(
     filament :: StraightVortexFilament,
     measurement_loc :: Vector3D
     )
-    r0 = filament.geometry.end_coord - filament.geometry.start_coord
-    r1 = measurement_loc - filament.geometry.start_coord
-    r2 = measurement_loc - filament.geometry.end_coord
-    if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
-        return Vector3D(0,0,0)
-    end
-    # From Katz & Plotkin, Eq(2.72), pg41
-    term1 = filament.vorticity / (4 * pi)
-    term2n = cross(r1, r2)
-    term2d = abs(cross(r1, r2)) ^ 2
-    term3 = dot(r0, unit(r1) - unit(r2))
-    vel =  term1 * (term2n / term2d) * term3
-    vel = (!isfinite(vel) ? Vector3D(0,0,0) : vel)
-    return vel
+    # Other objects - like vortex rings - will want to be able
+    # to use this in functional way, hence the indirection.
+    return induced_velocity(
+        StraightVortexFilament, 
+        filament.geometry.start_coord,
+        filament.geometry.end_coord,
+        filament.strength,
+        measurement_loc
+        )
 end
 
 function induced_velocity_curl(
     filament :: StraightVortexFilament,
     measurement_point :: Vector3D
     )
-
-    r0 = filament.geometry.end_coord - filament.geometry.start_coord
-    r1 = measurement_point - filament.geometry.start_coord
-    r2 = measurement_point - filament.geometry.end_coord
-    # Notes, HJAB, Book 4, pg.42-pg.43 for derivation of the general theme
-    # and pg70 for conversion to matrix expression.
-    term1 = filament.vorticity / ( 4 * pi)
-    term211 = -r0 / (abs(cross(r1, r0))^2)
-    term2121 = dot(r0, r1) / abs(r1)
-    term2122 = -dot(r0, r2) / abs(r2)
-    term221 = 3.0 / abs(r0)
-    term2221 = abs(cross(r0, r1)) / abs(r1)
-    term2222 = -abs(cross(r0, r2)) / abs(r2)
-    #term = term211 * (term2121 + term2122) +
-    #    term221 * (term2221 + term2222)
-    A = term211 * (term2121 + term2122)
-    B = term221 * (term2221 + term2222)
-    C = term1 * [B -A.z A.y; A.z B -A.x; -A.y A.x B]
-    return C
+    # Other objects - like vortex rings - will want to be able
+    # to use this in functional way, hence the indirection.
+    return induced_velocity_curl(
+        StraightVortexFilament, 
+        filament.geometry.start_coord,
+        filament.geometry.end_coord,
+        filament.strength,
+        measurement_loc
+        )
 end
 
 function euler!(
@@ -169,5 +154,48 @@ function vorticity_vector_velocity_influence(
     v = convert(Vector{Float}, induced_velocity(this, mes_pnt))
     this.vorticity = old_vorticity;
     return v
+end
+
+function induced_velocity(::Type{StraightVortexFilament},
+        start::Vector3D, stop::Vector3D, strength::Float64,
+        measurement_loc :: Vector3D)
+    r0 = stop - start
+    r1 = measurement_loc - start
+    r2 = measurement_loc - stop
+    if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
+        return Vector3D(0,0,0)
+    end
+    # From Katz & Plotkin, Eq(2.72), pg41
+    term1 = strength / (4 * pi)
+    term2n = cross(r1, r2)
+    term2d = abs(cross(r1, r2)) ^ 2
+    term3 = dot(r0, unit(r1) - unit(r2))
+    vel =  term1 * (term2n / term2d) * term3
+    vel = (!isfinite(vel) ? Vector3D(0,0,0) : vel)
+    return vel
+end
+
+function induced_velocity_curl(
+    ::Type{StraightVortexFilament},
+    start::Vector3D, stop::Vector3D, strength::Float64,
+    measurement_loc :: Vector3D
+    )
+
+    r0 = stop - start
+    r1 = measurement_point - start
+    r2 = measurement_point - stop
+    # Notes, HJAB, Book 4, pg.42-pg.43 for derivation of the general theme
+    # and pg70 for conversion to matrix expression.
+    term1 = strength / ( 4 * pi)
+    term211 = -r0 / (abs(cross(r1, r0))^2)
+    term2121 = dot(r0, r1) / abs(r1)
+    term2122 = -dot(r0, r2) / abs(r2)
+    term221 = 3.0 / abs(r0)
+    term2221 = abs(cross(r0, r1)) / abs(r1)
+    term2222 = -abs(cross(r0, r2)) / abs(r2)
+    A = term211 * (term2121 + term2122)
+    B = term221 * (term2221 + term2222)
+    C = term1 * [B -A.z A.y; A.z B -A.x; -A.y A.x B]
+    return C
 end
 #= END StraightVortexFilament ------------------------------------------=#
