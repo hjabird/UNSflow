@@ -52,8 +52,8 @@ end
 function Base.convert(
     ::Type{Vector{StraightVortexFilament}},
     a::VortexRing)
-    b = Vector{StraightVortexFilament}(4)
-    coords = a.goemetry.coords
+    b = Vector{StraightVortexFilament}(undef, 4)
+    coords = a.geometry.coords
     b[1] = StraightVortexFilament(coords[1], coords[2], a.strength)
     b[2] = StraightVortexFilament(coords[2], coords[3], a.strength)
     b[3] = StraightVortexFilament(coords[3], coords[4], a.strength)
@@ -86,17 +86,16 @@ function effective_radius(ring::VortexRing)
 end
 
 function vorticity(ring::VortexRing)
-    return mapreduce(vorticity, Vector3D(0,0,0), +,
-        convert(Vector{ThreeDStraightVortexFilament}(ring)))
+    return Vector3D(0,0,0)
 end
 
 function induced_velocity(
     inducing_ring :: VortexRing,
     measurement_loc :: Vector3D
     )
-    fils = convert(Vector{ThreeDStraightVortexFilament}, ring)
+    fils = convert(Vector{StraightVortexFilament}, inducing_ring)
     return mapreduce(x->induced_velocity(x, measurement_loc),
-        Vector3D(0,0,0), +, fils)
+        +, fils; init=Vector3D(0,0,0))
 end
 
 function induced_velocity_curl(

@@ -225,7 +225,18 @@ function vorticity_vector_velocity_influence(
     this :: VortexRingLattice,
     mes_pnt :: Vector3D)
 
-    error("Need to implement this...")
+    ret = zeros(3, vorticity_vector_length(this))
+    indexes = [(i, j) for 
+        i = 1 : size(this.strengths, 1), j = 1 : size(this.strengths, 2)]
+    indexes = vec(indexes)
+    for i = 1 : length(indexes)
+        idx = indexes[i]
+        quad = convert(BilinearQuad, this.geometry, idx[1], idx[2])
+        ring = VortexRing(quad, 1.)
+        influence = induced_velocity(ring, mes_pnt)
+        ret[:, i] = convert(Vector{Float64}, influence)
+    end
+    return ret
 end
 
 #= CONVERSION FUNCTIONS ------------------------------------------------------=#

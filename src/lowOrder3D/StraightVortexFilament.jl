@@ -90,7 +90,7 @@ function induced_velocity(
         StraightVortexFilament, 
         filament.geometry.start_coord,
         filament.geometry.end_coord,
-        filament.strength,
+        filament.vorticity,
         measurement_loc
         )
 end
@@ -105,7 +105,7 @@ function induced_velocity_curl(
         StraightVortexFilament, 
         filament.geometry.start_coord,
         filament.geometry.end_coord,
-        filament.strength,
+        filament.vorticity,
         measurement_loc
         )
 end

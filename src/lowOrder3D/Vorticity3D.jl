@@ -231,13 +231,22 @@ function normal_velocity_influence_matrix(
     mes_normals::Vector{Vector3D})
     @assert(size(mes_normals) == size(mes_points))
 
+    @assert(all(isfinite.(mes_normals)), "All input normals should have"*
+        " only finite components.")
+    if !all(isfinite.(mes_points))
+        @warn "Points with NaN or Inf components."
+    end
+
+    # Call number of points n
+    # Call vorticity_vector_length(inducing_body) m 
+
+    # Expect n long vector of vector{Vector3D}(m)
     ivs = map(
         x->vorticity_vector_velocity_influence(inducing_body, x), 
         mes_points)
-    ins = map(
-        x->dot(x[1], x[2]), zip(ivs, 
-        mes_normals))
-    a = zeros(length(mes_points), vorticiy_vector_length(inducing_body))
+    # Expect n long vector of vector{Float64}(m)
+    ins = map(x->dot(Matrix{Float64}(x[1]'), x[2]), zip(ivs, mes_normals))
+    a = zeros(length(mes_points), vorticity_vector_length(inducing_body))
     for i = 1 : length(mes_points)
         a[i, :] = ins[i]
     end
