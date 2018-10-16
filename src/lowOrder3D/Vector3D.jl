@@ -76,11 +76,12 @@ function Base.convert(::Type{Vector{Vector3D}}, a::Array{T, 1}) where T <: Real
     @assert(length(a) % 3 == 0, string("Conversion of Array{T<:Real,1} to"*
         " Array{UNSflow.Vector3D} requires that the array's length be a "*
         " multiple of 3. Length was ", length(a)))
-    arr = Vector{Vector3D}(undef, length(a)/3)
+    arr = Vector{Vector3D}(undef, Int64(length(a)/3))
     for i = 1:length(arr)
-        arr[i].x = arr[i*3 - 2]
-        arr[i].y = arr[i*3 - 1]
-        arr[i].z = arr[i*3 - 0]
+        arr[i] = Vector3D(0,0,0)
+        arr[i].x = a[i*3 - 2]
+        arr[i].y = a[i*3 - 1]
+        arr[i].z = a[i*3 - 0]
     end
     return arr
 end
@@ -179,14 +180,14 @@ function dot(a::Matrix{T}, b::Vector3D) where T <: Real
     @assert(size(a, 2) == 3, string("dot(Matrix, Vector3D) expects",
         " a matrix of size n x 3. The size of the matrix was",
         size(a), "."))
-    return a * convert(Vector{T}, b)
+    return vec(a * convert(Vector{T}, b))
 end
 
 function dot(a::Vector3D, b::Matrix{T}) where T <: Real
-    @assert(size(a, 1) == 3, string("dot(Matrix, Vector3D) expects",
+    @assert(size(b, 1) == 3, string("dot(Matrix, Vector3D) expects",
         " a matrix of size 3 x n. The size of the matrix was",
-        size(a), "."))
-    return convert(Vector{T}, a) * b
+        size(b), "."))
+    return vec(convert(Vector{T}, a)' * b)
 end
 
 function Base.abs(a::Vector3D)
@@ -197,7 +198,7 @@ function zero!(a::Vector3D)
     a.x = 0.0
     a.y = 0.0
     a.z = 0.0
-    return Void
+    return
 end
 
 function unit(a::Vector3D)
@@ -238,7 +239,18 @@ function Base.getindex(a::Vector3D, i::Int)  where Int <: Integer
 end
 
 function Base.size(a::Vector3D)
-    return [3]
+    return (3,)
+end
+
+function Base.size(a::Vector3D, b::Int)
+    if b == 1
+        return 3
+    elseif b > 1
+        return 1
+    else
+        # Copied from errors I get.
+        error("arraysize: dimension out of range")
+    end
 end
 
 function Base.length(a::Vector3D)
