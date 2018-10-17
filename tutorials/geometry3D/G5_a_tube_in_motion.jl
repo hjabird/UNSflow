@@ -1,8 +1,7 @@
 #===============================================================================
-    equation_surf_tube.jl
+    G5_a_tube_in_motion.jl
 
-    An example of how one might use EquationSurf to generate a surface.
-    The surface is then discretised and dumped into a VTK file for veiwing.
+    We'll use UNSflow.CoordinateTransform3D to add movement to our surfaces.
 
     Initial code: HJAB 2018
 
@@ -27,24 +26,45 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
+
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 import WriteVTK
 
-# First, we're going to make a tube.
-# We'll put the linear direction in z
+let
+#= Code to make a tube stolen from G1_making_a_tube.jl ========================#
 z_def = x->x[2]
-# And the cross section in x,y, remebering we have [-1,1] to work with.
 x_def = x->sin(pi * x[1])
 y_def = x->cos(pi * x[1])
-# And now we can make our surface.
 surf = UNSflow.EquationSurf(x_def, y_def, z_def)
-# To export it we need to discretise it. We'll turn it into some
-# BilinearQuad elements. We'll use a coarser discretisation in the z direction.
 discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:0.1:1), collect(-1:0.2:1))
+#= Finish making a tube =======================================================#
 
-# ... And now we can save it to a file:
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/equation_surf_tube", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+# We have a geometry so we can add motion. For now we'll define a twisting
+# motion. Our first argument, x, is a input Vector3D, and t is the current
+# time.
+trans = UNSflow.CoordinateTransform3D((x,t)->
+                            UNSflow.rotate_about_z(x, sin(t) * pi/2 * x.z))
+# Define a dt and create a complete cycle of oscillation, outputting the results
+# to a VTK file.
+nsteps = 200
+dt = 4*pi / nsteps
+UNSflow.increment!(trans, dt)
+for i = 1 : nsteps
+    # We need to make a copy of the original.
+    newsurf = Vector{UNSflow.BilinearQuad}()
+    for subsurf in discrete_surf
+        # Transform the coordinates
+        newcoords = trans.(UNSflow.coords(subsurf))
+        push!(newsurf, UNSflow.BilinearQuad(newcoords))
+    end
+    # And write to a VTK file.
+    points, cells = UNSflow.to_VtkMesh(newsurf)
+    str = string("output/G5_motion_tube_", i)
+    vtkfile = WriteVTK.vtk_grid(str, points, cells)
+    outfiles = WriteVTK.vtk_save(vtkfile)
+    # And its easy to forget to
+    UNSflow.increment!(trans, dt)
+end
+end # let

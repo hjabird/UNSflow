@@ -1,5 +1,5 @@
 #===============================================================================
-    equation_surf_path.jl
+    G3_equationsurf_paths.jl
 
     An example of how one might pick out a path on an equation surf.
 
@@ -31,7 +31,7 @@ import UNSflow
 import WriteVTK
 
 let
-#= Code to make a tube stolen from equation_surf_tube.jl ======================#
+#= Code to make a tube stolen from G1_making_a_tube.jl ========================#
 z_def = x->x[2]
 x_def = x->sin(pi * x[1])
 y_def = x->cos(pi * x[1])
@@ -56,7 +56,7 @@ vects = UNSflow.distribute(spline, 0, spline.limits[2], 300)
 points, cells = UNSflow.add_to_VtkMesh(points, cells, map(UNSflow.Point3D, vects))
 
 # Now turn it into a vtk file...
-vtkfile = WriteVTK.vtk_grid("output/equation_surf_path", points, cells)
+vtkfile = WriteVTK.vtk_grid("output/G3_surface_path", points, cells)
 outfiles = WriteVTK.vtk_save(vtkfile)
 
 end #let

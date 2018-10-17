@@ -191,6 +191,12 @@ function discretise(a::EquationSurf, ::Type{BilinearQuadSurf},
     return BilinearQuadSurf(coords)
 end
 
+function discretise(a::EquationSurf, ::Type{LatticeQuadSurf},
+    xgrid::Vector{T}, ygrid::Vector{T}) where T <: Real
+    bqs = discretise(a, BilinearQuadSurf, xgrid, ygrid)
+    return convert(LatticeQuadSurf, bqs)
+end
+
 function discretise(
     a::EquationSurf, ::Type{PolyLine2},
     path_waypoints::Matrix{Float64})

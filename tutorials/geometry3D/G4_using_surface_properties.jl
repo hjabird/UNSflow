@@ -1,5 +1,5 @@
 #===============================================================================
-    equation_surf_surf_properties.jl
+    G4_using_surface_properties.jl
 
     We'll use EquationSurf.derivative and EquationSurf.normal to
     offset our surface.
@@ -32,7 +32,7 @@ import UNSflow
 import WriteVTK
 
 let
-#= Code to make a tube stolen from equation_surf_tube.jl ======================#
+#= Code to make a tube stolen from G1_making_a_tube.jl ========================#
 z_def = x->x[2]
 x_def = x->sin(pi * x[1])
 y_def = x->cos(pi * x[1])
@@ -68,7 +68,7 @@ td2 = map(x->UNSflow.derivative(offset_surf, 2,x), tangent_coords)
 td1_mat = convert(Matrix{Float64}, td1)
 td2_mat = convert(Matrix{Float64}, td2)
 points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/equation_surf_surf_properties", points, cells)
+vtkfile = WriteVTK.vtk_grid("output/G4_using_surface_props_", points, cells)
 vtkfile = WriteVTK.vtk_cell_data(vtkfile, td1_mat, "Tangentd1")
 vtkfile = WriteVTK.vtk_cell_data(vtkfile, td2_mat, "Tangentd2")
 outfiles = WriteVTK.vtk_save(vtkfile)

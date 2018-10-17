@@ -50,6 +50,14 @@ mutable struct VortexRingLattice <: Vorticity3D
     end
 end
 
+function VortexRingLattice(
+    geometry :: BilinearQuadSurf)
+
+    ni, nj = size(geometry)
+    str = ones(ni, nj)
+    return VortexRingLattice(str, geometry)
+end
+
 #= VORTICITY3D functions -----------------------------------------------------=#
 function centre(a::VortexRingLattice)
     c = coords(a.geometry)
@@ -93,23 +101,23 @@ function induced_velocity(a::VortexRingLattice, measurement_loc::Vector3D)
         end
     end
     # external horizontal filaments
-    imax, jmax = size(a.ring_vertices)
+    imax, jmax = size(c)
     vel = mapreduce(
         i->induced_velocity(StraightVortexFilament, c[i, 1],
-        c[i+1, 1], a.strengths[i, 1], measurement_loc),
-        1 : id; init=vel)
+            c[i+1, 1], a.strengths[i, 1], measurement_loc),
+        +, 1 : id; init=vel)
     vel = mapreduce(
         i->induced_velocity(StraightVortexFilament, c[i, jmax],
-        c[i+1, jmax], -a.strengths[i, jmax], measurement_loc),
-        1 : id; init=vel)
+            c[i+1, jmax], -a.strengths[i, jd], measurement_loc),
+        +, 1 : id; init=vel)
     vel = mapreduce(
         j->induced_velocity(StraightVortexFilament, c[1, j],
-        c[1, j+1], -a.strengths[1, j], measurement_loc),
-        1 : jd; init=vel)
+            c[1, j+1], -a.strengths[1, j], measurement_loc),
+        +, 1 : jd; init=vel)
     vel = mapreduce(
         j->induced_velocity(StraightVortexFilament, c[imax, j],
-        c[imax, j+1], a.strengths[imax, j], measurement_loc),
-        1 : jd; init=vel)
+            c[imax, j+1], a.strengths[id, j], measurement_loc),
+        +, 1 : jd; init=vel)
     return vel
 end
 

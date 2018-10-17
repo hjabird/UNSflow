@@ -1,5 +1,5 @@
 #===============================================================================
-    equation_surf_sphere.jl
+    G2_making_spheres.jl
 
     We'll generate a sphere and output the discretisation to a VTK file.
     Because we are going to generate two hemisphere, this is ever so slightly
@@ -33,10 +33,9 @@ import UNSflow
 import WriteVTK
 
 let
-# First, we're going to make a tube.
-# We'll put the linear direction in z
+# Lets define the surface of a sphere such that our x[2] is the longitude
+# and x[1] is latitude:
 z_def = x->sin(x[2] * pi / 2)
-# And the cross section in x,y, remebering we have [-1,1] to work with.
 x_def = x->cos(x[1] * pi) * cos(x[2] * pi/2)
 y_def = x->sin(x[1] * pi) * cos(x[2] * pi/2)
 # And now we can make our surface.
@@ -48,7 +47,7 @@ discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
 
 # ... And now we can save it to a file:
 points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/equation_surf_sphere", points, cells)
+vtkfile = WriteVTK.vtk_grid("output/G2_bad_sphere", points, cells)
 outfiles = WriteVTK.vtk_save(vtkfile)
 
 # Take a look at the file - we have a huge number of cells at the poles, and
@@ -79,7 +78,7 @@ discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:1/6:1), collect(-1:1/6:1))
 points, cells = UNSflow.add_to_VtkMesh(points, cells, discrete_surf)
 
-vtkfile = WriteVTK.vtk_grid("output/equation_surf_sphere2", points, cells)
+vtkfile = WriteVTK.vtk_grid("output/G2_good_sphere", points, cells)
 outfiles = WriteVTK.vtk_save(vtkfile)
 
 end #let

@@ -107,6 +107,15 @@ function Base.convert(::Type{Vector{BilinearQuad}}, a::BilinearQuadSurf)
     return vec(convert(Matrix{BilinearQuad}, a))
 end
 
+#= The following function is in LatticeQuadSurf.jl
+function Base.convert(::Type{LatticeQuadSurf}, a::BilinearQuadSurf)
+return LatticeQuadSurf(a.coordinates)
+end
+
+This is because the LattieQuadSurf type must be declared before it can be used.
+This has been an issue in Julia since 2011. #MoveFastAndDontFixThings
+=#
+
 function normals(a::BilinearQuadSurf)
     v = a.coordinates
     ret = Matrix{Vector3D}(undef, size(a))

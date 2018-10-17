@@ -63,3 +63,19 @@ function in_bounds(a::PolyLine2, position::Vector{T}) where T <: Real
     @assert(length(position) == 1, "PolyLine2 is one dimensionsal.")
     return 0 <= position[1] <= length(a.coords)
 end
+
+function Base.convert(::Type{Line2}, a::PolyLine2, idx::Int)
+    @assert(idx < length(a.coords), string("Requested Line2 beyond bounds ",
+        "of given PolyLine2. Requested line of index ", idx,
+        " from polyline with ", length(a.coords)-1, " segments."))
+    @assert(idx > 0, string("Index must be more than 0. Input was ", idx))
+    return Line2(a.coords[idx], a.coords[idx+1])
+end
+
+function Base.convert(::Type{Vector{Line2}}, a::PolyLine2)
+    ret = Vector{Line2}(undef, length(a.coords)-1)
+    for i = 1 : length(a.coords) - 1
+        ret[i] = Line2(a.coords[i], a.coords[i + 1])
+    end
+    return ret
+end
