@@ -41,7 +41,7 @@ end
 # Return map a local coordinate to a point in space
 function evaluate(a::LatticeQuadSurf, local_coord::Vector{T},
     surfaceinterpolating::Bool=false) where T <: Real
-    @assert(length(position) == 2, "LatticeQuadSurf is two dimensionsal.")
+    @assert(length(local_coord) == 2, "LatticeQuadSurf is two dimensionsal.")
     if !surfaceinterpolating
         @assert(all(abs.(local_coord - round.(local_coord) .<= eps(T)),
             string("The LatticeQuadSurf is only defined on the lattice ",
@@ -56,10 +56,10 @@ function evaluate(a::LatticeQuadSurf, local_coord::Vector{T},
     g = [v[xf+1, yf], v[xf+1, yf+1], v[xf, yf+1], v[xf, yf]]
     x = (local_coord[1] % 1) * 2 - 1
     y = (local_coord[2] % 1) * 2 - 1
-    t1 = g[1] * (x-1)(y-1) / 4
-    t2 = - g[2] * (x+1)(y-1) / 4
-    t3 = g[3] * (x+1)(y+1) / 4
-    t4 = - g[4] * (x-1)(y+1) / 4
+    t1 = g[1] * (x-1)*(y-1) / 4
+    t2 = - g[2] * (x+1)*(y-1) / 4
+    t3 = g[3] * (x+1)*(y+1) / 4
+    t4 = - g[4] * (x-1)*(y+1) / 4
     return t1 + t2 + t3 + t4
 end
 

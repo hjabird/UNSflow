@@ -45,14 +45,40 @@ end
 
 # Return map a local coordinate to a point in space
 function evaluate(a::BilinearQuad, local_coord::Vector{T}) where T <: Real
-    @assert(length(position) == 2, "BilinearQuad is two dimensionsal.")
+    @assert(length(local_coord) == 2, "BilinearQuad is two dimensionsal.")
     x = local_coord[1]
     y = local_coord[2]
-    t1 = a.c1 * (x-1)(y-1) / 4
-    t2 = - a.c2 * (x+1)(y-1) / 4
-    t3 = a.c3 * (x+1)(y+1) / 4
-    t4 = - a.c4 * (x-1)(y+1) / 4
+    t1 = a.c1 * (x-1)*(y-1) / 4
+    t2 = - a.c2 * (x+1)*(y-1) / 4
+    t3 = a.c3 * (x+1)*(y+1) / 4
+    t4 = - a.c4 * (x-1)*(y+1) / 4
     return t1 + t2 + t3 + t4
+end
+
+function derivative(a::BilinearQuad, direction::Int, 
+    local_coord::Vector{T}) where T <: Real
+
+    @assert(length(local_coord) == 2, "BilinearQuad is two dimensionsal.")
+    @assert(0 < direction <= 2, string("BilinearQuad can be differentiated",
+        " in either the local x or local y direction, corresponding to values",
+        " of direction of 1 and 2 respectively. Input was ", direction))
+    ret = 0.0
+    x = local_coord[1]
+    y = local_coord[2]
+    if direction == 1
+        t1 = a.c1 * (y - 1)
+        t2 = -a.c2 * (y - 1)
+        t3 = a.c3 * (y + 1)
+        t4 = -a.c4 * (y + 1)
+        ret = (t1 + t2 + t3 + t4) / 4
+    else
+        t1 = a.c1 * (x - 1)
+        t2 = -a.c2 * (x + 1)
+        t3 = a.c3 * (x + 1)
+        t4 = -a.c4 * (x - 1)
+        ret = (t1 + t2 + t3 + t4) / 4
+    end
+    return ret
 end
 
 # Return a vector of coordinates the interpolation points of the geometry
@@ -74,4 +100,11 @@ end
 function in_bounds(a::BilinearQuad, position::Vector{T}) where T <: Real
     @assert(length(position) == 2, "BilinearQuad is two dimensionsal.")
     return (-1 <= position[1] <= 1) && (-1 <= position[2] <= 1)
+end
+
+function area(a::BilinearQuad)
+    d1 = derivative(a, 1, [0,0])
+    d2 = derivative(a, 2, [0,0])
+    area = abs(cross(d1, d2))
+    return area
 end

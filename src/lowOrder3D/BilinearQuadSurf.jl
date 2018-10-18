@@ -40,17 +40,17 @@ end
 
 # Return map a local coordinate to a point in space
 function evaluate(a::BilinearQuadSurf, local_coord::Vector{T}) where T <: Real
-    @assert(length(position) == 2, "BilinearQuadSurf is two dimensionsal.")
+    @assert(length(local_coord) == 2, "BilinearQuadSurf is two dimensionsal.")
     xf = Int64(local_coord[1])
     yf = Int64(local_coord[2])
     v = a.coordinates
     g = [v[xf+1, yf], v[xf+1, yf+1], v[xf, yf+1], v[xf, yf]]
     x = (local_coord[1] % 1) * 2 - 1
     y = (local_coord[2] % 1) * 2 - 1
-    t1 = g[1] * (x-1)(y-1) / 4
-    t2 = - g[2] * (x+1)(y-1) / 4
-    t3 = g[3] * (x+1)(y+1) / 4
-    t4 = - g[4] * (x-1)(y+1) / 4
+    t1 = g[1] * (x-1)*(y-1) / 4
+    t2 = - g[2] * (x+1)*(y-1) / 4
+    t3 = g[3] * (x+1)*(y+1) / 4
+    t4 = - g[4] * (x-1)*(y+1) / 4
     return t1 + t2 + t3 + t4
 end
 
@@ -140,4 +140,18 @@ function centres(a::BilinearQuadSurf)
         end
     end
     return ret
+end
+
+function areas(a::BilinearQuadSurf)
+    ni, nj = size(a)
+    v = zeros(ni, nj)
+    idxs = [(i, j) for i = 1:ni, j = 1:nj]
+    for idx in idxs
+        zeros[idx[1], idx[2]] = area(convert(BilinearQuad, a, idx[2], idx[2]))
+    end
+    return v
+end
+
+function area(a::BilinearQuadSurf)
+    return sum(areas(a))
 end

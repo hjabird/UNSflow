@@ -61,7 +61,8 @@ tangent_coords = vec(reshape([[x, y] for y=tang_range,x=tang_range], :, 1))
 # And generate our tangents:
 td1 = map(x->UNSflow.derivative(offset_surf, 1,x), tangent_coords)
 td2 = map(x->UNSflow.derivative(offset_surf, 2,x), tangent_coords)
-
+# We can also extract element areas:
+areas = vec(UNSflow.area.(discrete_surf))
 
 # And save to VTK
 # We need to convert our vector of tangents to matrices...
@@ -71,6 +72,7 @@ points, cells = UNSflow.to_VtkMesh(discrete_surf)
 vtkfile = WriteVTK.vtk_grid("output/G4_using_surface_props_", points, cells)
 vtkfile = WriteVTK.vtk_cell_data(vtkfile, td1_mat, "Tangentd1")
 vtkfile = WriteVTK.vtk_cell_data(vtkfile, td2_mat, "Tangentd2")
+vtkfile = WriteVTK.vtk_cell_data(vtkfile, areas, "Area")
 outfiles = WriteVTK.vtk_save(vtkfile)
 
 end #let
