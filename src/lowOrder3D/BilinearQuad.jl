@@ -105,6 +105,6 @@ end
 function area(a::BilinearQuad)
     d1 = derivative(a, 1, [0,0])
     d2 = derivative(a, 2, [0,0])
-    area = abs(cross(d1, d2))
+    area = abs(cross(d1, d2)) * 4   # We have one int point in [-1,1], [-1, 1]
     return area
 end

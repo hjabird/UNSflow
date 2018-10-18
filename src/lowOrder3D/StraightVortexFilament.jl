@@ -110,6 +110,20 @@ function induced_velocity_curl(
         )
 end
 
+function steady_force(a::StraightVortexFilament,
+    vel_fn::Function, 
+    density::Real=1, 
+    samples::Int=1)
+
+    return steady_force(StraightVortexFilament,
+        a.geometry.start_coord,
+        a.geometry.end_coord,
+        a.vorticity,
+        vel_fn,
+        density,
+        samples)
+end
+
 function euler!(
     a::StraightVortexFilament,
     b::Vorticity3D,
@@ -197,5 +211,27 @@ function induced_velocity_curl(
     B = term221 * (term2221 + term2222)
     C = term1 * [B -A.z A.y; A.z B -A.x; -A.y A.x B]
     return C
+end
+
+# The Kutta-Joukowski theorum
+function steady_force(
+    ::Type{StraightVortexFilament},
+    start::Vector3D, stop::Vector3D, strength::Float64, 
+    vel_fn::Function, 
+    density::Real=1, 
+    samples::Int=1)
+
+    @assert(hasmethod(vel_fn, Tuple{Vector3D}),
+        "Expected induced_vel_fn passed to steady force function to take a "*
+        "single arguement of type UNSflow.Vector3D.")
+    @assert(samples > 0, string("Samples was expected to be 1 or more. Given ",
+        "value was ", samples, "."))
+
+    mps = collect(-1: 2/samples : 1)
+    mes_locs = map(x->-0.5 * start * (x - 1) + 0.5 * stop * (x + 1), mps)
+    vels = map(vel_fn, mes_locs)
+    force = mapreduce(x->density*cross(x, (stop - start) * strength / samples),
+        +, vels, init=Vector3D(0,0,0))
+    return force
 end
 #= END StraightVortexFilament ------------------------------------------=#

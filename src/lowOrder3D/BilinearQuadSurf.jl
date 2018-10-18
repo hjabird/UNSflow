@@ -147,7 +147,7 @@ function areas(a::BilinearQuadSurf)
     v = zeros(ni, nj)
     idxs = [(i, j) for i = 1:ni, j = 1:nj]
     for idx in idxs
-        zeros[idx[1], idx[2]] = area(convert(BilinearQuad, a, idx[2], idx[2]))
+        v[idx[1], idx[2]] = area(convert(BilinearQuad, a, idx[1], idx[2]))
     end
     return v
 end

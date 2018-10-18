@@ -6,18 +6,28 @@ import WriteVTK
 let
 
 # Make something wing shaped:
-surf_fn = x->UNSflow.Vector3D(x[1]/2, x[2]*2, 0)
+surf_fn = x->UNSflow.Vector3D(sqrt(1- x[2]^2) *x[1]/2, x[2]*2, 0)
 wing_surf = UNSflow.EquationSurf(surf_fn)
-spanwise = vcat(collect(-1:0.02:-0.8), collect(-0.7:0.2:0.7), collect(0.8:0.02:1))
-wing_goem = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf, collect(-1:0.2:1), spanwise)
+spanwise = map(x->cbrt(x), -1:0.05:1)
+wing_geom = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf, collect(-1:0.25:1), spanwise)
 
 # Problem setup
-problem = UNSflow.VortexLatticeMethod(wing_goem, UNSflow.Vector3D(1., 0., 0.2), vcat(collect(0.3:0.3:4), [100]))
-for i = 1 : 30
+downstream = map(x->x^1.4, collect(0:0.1:3)[2:end] .* 5)
+free_stream = UNSflow.Vector3D(1., 0., 0.2)
+problem = UNSflow.VortexLatticeMethod(wing_geom, free_stream, downstream)
+for i = 1 : 1
     UNSflow.solve!(problem)
     UNSflow.relax_wake!(problem)
 end
+#=
+ind_vel_fn = x -> free_stream + UNSflow.induced_velocity(problem.wake_aerodynamic, x) + UNSflow.induced_velocity(problem.wing_aerodynamic, x)
+force, moment, pressure = UNSflow.steady_loads(problem.wing_aerodynamic, ind_vel_fn)
 
+
+println("Wing area is ", UNSflow.area(wing_geom))
+println("Forces are ", force)
+println("Moments are ", moment)
+=#
 # And plot the shape of stuff:
 points, cells = UNSflow.to_VtkMesh(convert(Vector{UNSflow.BilinearQuad}, problem.wing_geometry))
 points, cells = UNSflow.add_to_VtkMesh(points, cells, convert(Vector{UNSflow.BilinearQuad}, problem.wake_aerodynamic.geometry))

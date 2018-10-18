@@ -98,7 +98,9 @@ function relax_wake!(a::VortexLatticeMethod)
         moves = map(
             x->(x[1] - dot(x[1], x[2]) * x[2]) * 0.1, 
             zip(vels, comparison_vect))
-        a.wake_aerodynamic.geometry.coordinates[i,:] += moves
+        for j = i : size(a.wake_aerodynamic.geometry.coordinates, 1)
+            a.wake_aerodynamic.geometry.coordinates[j,:] += moves
+        end
     end
     return
 end
