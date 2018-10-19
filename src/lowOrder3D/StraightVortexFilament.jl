@@ -72,7 +72,7 @@ function centre(filament::StraightVortexFilament)
 end
 
 function effective_radius(filament::StraightVortexFilament)
-    return (filament.geometry.start_coord - filament.geometry.end_coord) / 2
+    return abs(filament.geometry.start_coord - filament.geometry.end_coord) / 2
 end
 
 function vorticity(filament::StraightVortexFilament)
@@ -108,6 +108,20 @@ function induced_velocity_curl(
         filament.vorticity,
         measurement_loc
         )
+end
+
+function steady_force(a::StraightVortexFilament,
+    vel_fn::Function, 
+    density::Real=1, 
+    samples::Int=1)
+
+    return steady_force(StraightVortexFilament,
+        a.geometry.start_coord,
+        a.geometry.end_coord,
+        a.vorticity,
+        vel_fn,
+        density,
+        samples)
 end
 
 function euler!(
@@ -162,16 +176,29 @@ function induced_velocity(::Type{StraightVortexFilament},
     r0 = stop - start
     r1 = measurement_loc - start
     r2 = measurement_loc - stop
-    if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
+    #=if(abs(r1) <= eps(Float64) || abs(r2) <= eps(Float64))
+        println("Here: ", r1, " ", r2)
         return Vector3D(0,0,0)
-    end
+    end=#
     # From Katz & Plotkin, Eq(2.72), pg41
     term1 = strength / (4 * pi)
     term2n = cross(r1, r2)
     term2d = abs(cross(r1, r2)) ^ 2
+    if term2d < 1e-8 
+        # We might be on the filament or near to it - careful check time.
+        d = abs(term2n) / abs(r0) 
+        if d < eps(Float64) * abs(r0) * 10 || isnan(d)
+            return Vector3D(0,0,0)
+        end
+    end
     term3 = dot(r0, unit(r1) - unit(r2))
     vel =  term1 * (term2n / term2d) * term3
-    vel = (!isfinite(vel) ? Vector3D(0,0,0) : vel)
+    if !isfinite(vel)        
+        d = abs(term2n) / abs(r0) 
+        @warn string("Evaluated induced velocity from vortex filament as ",
+            "non-finite. Filament vorticity density was ", vorticity, ", and",
+            " distance of point from filament was ", d, ".")
+    end
     return vel
 end
 
@@ -187,7 +214,7 @@ function induced_velocity_curl(
     # Notes, HJAB, Book 4, pg.42-pg.43 for derivation of the general theme
     # and pg70 for conversion to matrix expression.
     term1 = strength / ( 4 * pi)
-    term211 = -r0 / (abs(cross(r1, r0))^2)
+    term211 = -r0 / (abs(cross(r1, r0))^2)    
     term2121 = dot(r0, r1) / abs(r1)
     term2122 = -dot(r0, r2) / abs(r2)
     term221 = 3.0 / abs(r0)
@@ -197,5 +224,28 @@ function induced_velocity_curl(
     B = term221 * (term2221 + term2222)
     C = term1 * [B -A.z A.y; A.z B -A.x; -A.y A.x B]
     return C
+end
+
+# The Kutta-Joukowski theorum
+function steady_force(
+    ::Type{StraightVortexFilament},
+    start::Vector3D, stop::Vector3D, strength::Real, 
+    vel_fn::Function, 
+    density::Real=1, 
+    samples::Int=1)
+
+    @assert(hasmethod(vel_fn, Tuple{Vector3D}),
+        "Expected induced_vel_fn passed to steady force function to take a "*
+        "single arguement of type UNSflow.Vector3D.")
+    @assert(samples > 0, string("Samples was expected to be 1 or more. Given ",
+        "value was ", samples, "."))
+
+    mps = collect(-1: 2/samples : 1)
+    mes_locs = map(x->-0.5 * start * (x - 1) + 0.5 * stop * (x + 1), mps)
+    mes_locs = (mes_locs[1:end-1] + mes_locs[2:end]) / 2
+    vels = map(vel_fn, mes_locs)
+    force = mapreduce(x->density*cross(x, (stop - start) * strength / samples),
+        +, vels, init=Vector3D(0,0,0))
+    return force
 end
 #= END StraightVortexFilament ------------------------------------------=#
