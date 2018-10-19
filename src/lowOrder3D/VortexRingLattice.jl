@@ -178,15 +178,23 @@ function steady_forces(a::VortexRingLattice,
         "single arguement of type UNSflow.Vector3D.")
     function asserttmplt(argname, arg, dim)
         @assert((length(arg) == 0) || (length(arg) ==
+<<<<<<< HEAD
             size(a.strengths, dim)), string("Incorrect length vector ",
             "passed through keyword argument ", argname, ". Length was ",
             length(arg), ". Should have been ", 
             size(a.strengths, dim), "."))
+=======
+            size(a.coordinates, dim) - 1), string("Incorrect length vector ",
+            "passed through keyword argument ", argname, ". Length was ",
+            length(arg), ". Should have been ", 
+            size(a.coordinates, dim) - 1, "."))
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         if any(isnan.(arg)) || any(isinf.(arg))
             @warn string("Vector passed through keyword arguement ",
                 argname, " has NaN or Inf compents.")
         end
     end
+<<<<<<< HEAD
     asserttmplt("i1_filament_strs", i1_filament_strs, 2)
     asserttmplt("imax_filament_strs", imax_filament_strs, 2)
     asserttmplt("j1_filament_strs", j1_filament_strs, 1)
@@ -196,11 +204,26 @@ function steady_forces(a::VortexRingLattice,
     imax_filament_strs = replacefn(imax_filament_strs, 2)
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
+=======
+    asserttmplt("i1_filament_strs", i1_filament_strs, 1)
+    asserttmplt("imax_filament_strs", imax_filament_strs, 1)
+    asserttmplt("j1_filament_strs", j1_filament_strs, 2)
+    asserttmplt("jmax_filament_strs", jmax_filament_strs, 2)
+    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
+    i1_filament_strs = replacefn(i1_filament_strs, 1)
+    imax_filament_strs = replacefn(imax_filament_strs, 1)
+    j1_filament_strs = replacefn(j1_filament_strs, 2)
+    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
 
     # AND the actual maths bit:
     id, jd = size(a.strengths)
     c = a.geometry.coordinates
+<<<<<<< HEAD
     forces = map(x->Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
+=======
+    forces = map(Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     force_fn = (sta, sto, str)->steady_force(StraightVortexFilament, sta, sto, 
                                                         str, vel_fn, density)
     # internal horizontal filaments
@@ -209,7 +232,11 @@ function steady_forces(a::VortexRingLattice,
             start = c[i, j]
             stop = c[i, j + 1]
             str = a.strengths[i - 1, j] - a.strengths[i, j]
+<<<<<<< HEAD
             force = force_fn(start, stop, str)
+=======
+            force = force_fn(start, strop, str)
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
             forces[i-1, j] += force / 2
             forces[i, j] += force / 2
         end
@@ -220,7 +247,11 @@ function steady_forces(a::VortexRingLattice,
             start = c[i, j]
             stop = c[i + 1, j]
             str = a.strengths[i, j] - a.strengths[i, j - 1]
+<<<<<<< HEAD
             force = force_fn(start, stop, str)
+=======
+            force = force_fn(start, strop, str)
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
             forces[i, j-1] += force / 2
             forces[i, j] += force / 2
         end
@@ -233,6 +264,7 @@ function steady_forces(a::VortexRingLattice,
         collect(1:jmax-1))
     forces[:, jd] += map(
         i->force_fn(c[i+1, jmax], c[i, jmax], 
+<<<<<<< HEAD
             a.strengths[i, jd] + jmax_filament_strs[id - i + 1]), 
         collect(1:imax-1))
     forces[1, :] += map(
@@ -242,6 +274,17 @@ function steady_forces(a::VortexRingLattice,
     forces[:, 1] += map(
         i->force_fn(c[i, 1], c[i + 1, 1], 
             a.strengths[i, 1] + j1_filament_strs[i]), 
+=======
+            a.strengths[i, jd] + imax_filament_strs[id - i + 1]), 
+        collect(1:imax-1))
+    forces[1, :] += map(
+        j->force_fn(c[1, j+1], c[1, j], 
+            a.strengths[1, j] + imax_filament_strs[ij - j + 1]), 
+        collect(1:jmax-1))
+    forces[:, 1] += map(
+        i->force_fn(c[i, 1], c[i + 1, 1], 
+            a.strengths[i, 1] + imax_filament_strs[i]), 
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         collect(1:imax-1))
     return forces
 end
@@ -254,6 +297,7 @@ function steady_pressures(a::VortexRingLattice,
     i1_filament_strs::Vector{T}=Vector{Float64}()  ,   # Top edge
     j1_filament_strs::Vector{T}=Vector{Float64}()  ) where T <: Real # Left edge
 
+<<<<<<< HEAD
     replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.strengths, dim))
     i1_filament_strs = replacefn(i1_filament_strs, 2)
     imax_filament_strs = replacefn(imax_filament_strs, 2)
@@ -261,14 +305,27 @@ function steady_pressures(a::VortexRingLattice,
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
     force = steady_forces(a, vel_fn, density;
+=======
+    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
+    i1_filament_strs = replacefn(i1_filament_strs, 1)
+    imax_filament_strs = replacefn(imax_filament_strs, 1)
+    j1_filament_strs = replacefn(j1_filament_strs, 2)
+    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
+
+    force = steady_forces(a, vel_fn, density,
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         imax_filament_strs=imax_filament_strs,
         jmax_filament_strs=jmax_filament_strs,
         i1_filament_strs=i1_filament_strs,
         j1_filament_strs=j1_filament_strs)
     mareas = areas(a.geometry)
+<<<<<<< HEAD
     mnormals = normals(a.geometry)
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, force))
     press = normal_forces ./ mareas
+=======
+    press = forces ./ mareas
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     return press
 end
 
@@ -281,6 +338,7 @@ function steady_loads(a::VortexRingLattice,
     i1_filament_strs::Vector{T}=Vector{Float64}()  ,   # Top edge
     j1_filament_strs::Vector{T}=Vector{Float64}()  ) where T <: Real # Left edge
 
+<<<<<<< HEAD
     replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.strengths, dim))
     i1_filament_strs = replacefn(i1_filament_strs, 2)
     imax_filament_strs = replacefn(imax_filament_strs, 2)
@@ -288,15 +346,33 @@ function steady_loads(a::VortexRingLattice,
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
     mforces = steady_forces(a, velocity_fn, density;
+=======
+    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
+    i1_filament_strs = replacefn(i1_filament_strs, 1)
+    imax_filament_strs = replacefn(imax_filament_strs, 1)
+    j1_filament_strs = replacefn(j1_filament_strs, 2)
+    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
+
+    println(typeof(a))
+    println(typeof(velocity_fn))
+    pres = steady_pressures(a, velocity_fn, density,
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         imax_filament_strs=imax_filament_strs,
         jmax_filament_strs=jmax_filament_strs,
         i1_filament_strs=i1_filament_strs,  
         j1_filament_strs=j1_filament_strs)
+<<<<<<< HEAD
+=======
+    # We need forces back...
+    mareas = areas(a.geometry)
+    mforces = mareas .* pres
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     mcents = centres(a.geometry)
     total_forces = sum(mforces)
     moment_contrib = map(
         x->cross(x[1]-measurement_centre, x[2]),
         zip(mcents, mforces))
+<<<<<<< HEAD
     total_moment = sum(moment_contrib)
     # Calculate pressures... meh...
     mareas = areas(a.geometry)
@@ -304,6 +380,9 @@ function steady_loads(a::VortexRingLattice,
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, mforces))
     all_pressures = normal_forces ./ mareas
     return total_forces, total_moment, all_pressures
+=======
+    return total_forces, moment_contrib, pres
+>>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
 end
 
 function state_vector_length(a::VortexRingLattice)
