@@ -84,7 +84,9 @@ function solve!(a::VortexLatticeMethod)
 end
 
 # Make the wake the correct shape.
-function relax_wake!(a::VortexLatticeMethod)
+function relax_wake!(
+    a::VortexLatticeMethod; 
+    relaxation_factor::T=0.1) where T <: Real
 
     points = a.wake_aerodynamic.geometry.coordinates
     for i = 2 : size(a.wake_aerodynamic.geometry.coordinates, 1)
@@ -96,9 +98,11 @@ function relax_wake!(a::VortexLatticeMethod)
         comparison_vect = unit.(points[i, :] - points[i-1, :])
         # Don't move in the direction of the comparison vector - only normal.
         moves = map(
-            x->(x[1] - dot(x[1], x[2]) * x[2]) * 0.1, 
+            x->(x[1] - dot(x[1], x[2]) * x[2]) * relaxation_factor, 
             zip(vels, comparison_vect))
-        a.wake_aerodynamic.geometry.coordinates[i,:] += moves
+        for j = i : size(a.wake_aerodynamic.geometry.coordinates, 1)
+            a.wake_aerodynamic.geometry.coordinates[j,:] += moves
+        end
     end
     return
 end
