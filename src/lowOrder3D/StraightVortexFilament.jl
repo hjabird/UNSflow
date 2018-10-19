@@ -229,11 +229,7 @@ end
 # The Kutta-Joukowski theorum
 function steady_force(
     ::Type{StraightVortexFilament},
-<<<<<<< HEAD
     start::Vector3D, stop::Vector3D, strength::Real, 
-=======
-    start::Vector3D, stop::Vector3D, strength::Float64, 
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     vel_fn::Function, 
     density::Real=1, 
     samples::Int=1)
@@ -246,10 +242,7 @@ function steady_force(
 
     mps = collect(-1: 2/samples : 1)
     mes_locs = map(x->-0.5 * start * (x - 1) + 0.5 * stop * (x + 1), mps)
-<<<<<<< HEAD
     mes_locs = (mes_locs[1:end-1] + mes_locs[2:end]) / 2
-=======
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     vels = map(vel_fn, mes_locs)
     force = mapreduce(x->density*cross(x, (stop - start) * strength / samples),
         +, vels, init=Vector3D(0,0,0))

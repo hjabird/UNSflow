@@ -31,7 +31,7 @@ mutable struct VortexLatticeMethod
     free_stream :: Vector3D
 
     wing_aerodynamic :: VortexRingLattice
-    wake_aerodynamic :: VortexRingLattice
+    wake_aerodynamic :: LinkedVorticity3D
 
     function VortexLatticeMethod(
         wing_geometry :: BilinearQuadSurf, 
@@ -54,7 +54,10 @@ mutable struct VortexLatticeMethod
             wake_points[:, j] = wake_points[:, j] .+ dstream_vects
         end
         wake_aero = VortexRingLattice(BilinearQuadSurf(wake_points))
-        new(wing_geometry, free_stream, wing_aero, wake_aero)
+        transform_mat = trailing_edge_to_wake_vorticity_transform_matrix(
+            wing_aero, wake_aero)
+        wake_linked = LinkedVorticity3D(wake_aero, wing_aero, transform_mat)
+        new(wing_geometry, free_stream, wing_aero, wake_linked)
     end
 end
 
@@ -64,11 +67,8 @@ function solve!(a::VortexLatticeMethod)
     
     wing_mtrx = normal_velocity_influence_matrix(a.wing_aerodynamic, 
         wing_centres, wing_normals)
-
     wake_mtrx = normal_velocity_influence_matrix(a.wake_aerodynamic,
         wing_centres, wing_normals)
-    wake_trnsform = trailing_edge_to_wake_vorticity_transform_matrix(a)
-    wake_mtrx *= wake_trnsform
 
     fs_vector = map(
         x->dot(a.free_stream, x[2]), 
@@ -77,9 +77,8 @@ function solve!(a::VortexLatticeMethod)
     # (wake_mtrx + wing_mtrx)*solution + fs_vector = 0
     soln = (wake_mtrx + wing_mtrx) \ (-fs_vector)
     
-    wake_soln = wake_trnsform * soln
     update_using_vorticity_vector!(a.wing_aerodynamic, soln)
-    update_using_vorticity_vector!(a.wake_aerodynamic, wake_soln)
+    update_using_vorticity_vector!(a.wake_aerodynamic, soln)
     return
 end
 
@@ -108,22 +107,34 @@ function relax_wake!(
 end
 
 function trailing_edge_to_wake_vorticity_transform_matrix( 
-    a::VortexLatticeMethod)
+    wing_lattice::VortexRingLattice, wake_lattice::VortexRingLattice)
     # Each strip in the wake has the same ring vorticity. This matches the
     # TE ring the strip is associated with. We want to control the wake the
     # wing vorticity vector - specifically the TE part. We therefore need a 
     # transformation matrix.
-    # The vorticity vector will go in the i direction of the wake first.
-    wake_veclen = vorticity_vector_length(a.wake_aerodynamic)
-    ni, nj = size(a.wing_aerodynamic.geometry)
-    nk, nl = size(a.wake_aerodynamic.geometry)
+    was = wake_lattice.vorticity
+    wis = wing_lattice.vorticity
+
+    wing_te_vort_vec_idxs = extract_vorticity_vector_indexes(
+        wing_lattice, [size(wis, 1)], collect(1 :size(wis, 2)))
+    wake_transform = zeros( length(was), length(wis) )
+    for j = 1 : size(was, 2)
+        wake_idxs = extract_vorticity_vector_indexes(
+            wake_lattice, collect(1:size(was, 1)), [j])
+        wake_transform[wake_idxs, wing_te_vort_vec_idxs[j]] .= 1
+    end
+    return wake_transform
+#=
+    wake_veclen = vorticity_vector_length(wake_lattice)
+    ni, nj = size(wing_lattice.geometry)
+    nk, nl = size(wake_lattice.geometry)
     wake_trnsform = zeros( nk * nl, ni * nj )
     for i = 1 : nj  # Once for each TE ring on Wing
         irange_start = (i - 1) * nk + 1
         irange_end = i * nk
         j_pos = i * ni
-        wake_trnsform[irange_start:irange_end, j_pos] = 
-            ones(irange_end - irange_start + 1)
+        wake_trnsform[irange_start:irange_end, j_pos] .= 1
     end
     return wake_trnsform
+=#
 end

@@ -51,7 +51,7 @@ wing_geom = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf,
 # STEP 2: Define the free stream and wake parameters to setup the problem ------
 free_stream = UNSflow.Vector3D(1., 0, 0)
 # We have to decide on how to discretise the wake as it travels downstream.
-downstream = map(x->x^1.4, collect(0:0.1:3)[2:end] .* 5)
+downstream = map(x->x^1.4, collect(0:0.2:3)[2:end] .* 5)
 problem = UNSflow.VortexLatticeMethod(wing_geom, free_stream, downstream)
 
 # STEP 3: Solve the system -----------------------------------------------------
@@ -74,7 +74,7 @@ force, moment, pressure = UNSflow.steady_loads(
     ind_vel_fn; 
     # The wing vortex lattice is overlapped by that of the wake, so we need to 
     # correct for that - imax indicates the maximum i index of the lattice.
-    imax_filament_strs=-problem.wake_aerodynamic.strengths[1,:])
+    imax_filament_strs=-problem.wake_aerodynamic.child_object.vorticity[1,:])
 
 # Print out some useful things:
 println("Wing area is ", UNSflow.area(wing_geom))
@@ -85,7 +85,7 @@ println("Moments are ", moment)
 
 # STEP 5: Output to VTK file ---------------------------------------------------
 pressure = vcat(vec(pressure), 
-                zeros(length(problem.wake_aerodynamic.strengths)))
+                zeros(length(problem.wake_aerodynamic.child_object.vorticity)))
 
 # And plot the shape of stuff:
 points, cells = UNSflow.to_VtkMesh(
@@ -95,8 +95,8 @@ points, cells = UNSflow.add_to_VtkMesh(
     convert(Vector{UNSflow.BilinearQuad}, problem.wake_aerodynamic.geometry))
 vtkfile = WriteVTK.vtk_grid("output/steady_vortex_lattice", points, cells)
 vorticity = vcat(
-    vec(problem.wing_aerodynamic.strengths), 
-    vec(problem.wake_aerodynamic.strengths))
+    vec(problem.wing_aerodynamic.vorticity), 
+    vec(problem.wake_aerodynamic.child_object.vorticity))
 WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
 WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure")
 outfiles = WriteVTK.vtk_save(vtkfile)

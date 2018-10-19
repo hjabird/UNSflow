@@ -27,7 +27,7 @@
 ------------------------------------------------------------------------------=#
 
 mutable struct VortexRingLattice <: Vorticity3D
-    strengths :: Matrix{Float64}
+    vorticity :: Matrix{Float64}
     geometry :: BilinearQuadSurf
 
     function VortexRingLattice(x_rings::Float64, y_rings::Float64)
@@ -36,17 +36,17 @@ mutable struct VortexRingLattice <: Vorticity3D
         new(strs, geometry)
     end
     function VortexRingLattice(
-        strengths :: Matrix{Float64},
+        vorticity :: Matrix{Float64},
         geometry :: BilinearQuadSurf)
 
-        @assert(size(strengths) == size(geometry),
-            string("Size of strengths != Size of geometry.",
-            " size(strengths) = ", size(strengths),
+        @assert(size(vorticity) == size(geometry),
+            string("Size of vorticity != Size of geometry.",
+            " size(vorticity) = ", size(vorticity),
             " and size(geometry) = ", size(geometry), "."))
-        if any(isnan.(strengths)) || any(isinf.(strengths))
-            @warn "strengths contained NaN or Inf value(s)."
+        if any(isnan.(vorticity)) || any(isinf.(vorticity))
+            @warn "vorticity contained NaN or Inf value(s)."
         end
-        new(strengths, geometry)
+        new(vorticity, geometry)
     end
 end
 
@@ -78,14 +78,14 @@ end
 
 function induced_velocity(a::VortexRingLattice, measurement_loc::Vector3D)
     vel = Vector3D(0,0,0)
-    id, jd = size(a.strengths)
+    id, jd = size(a.vorticity)
     c = a.geometry.coordinates
     # internal horizontal filaments
     for i = 2 : id
         for j = 1 : jd
             start = c[i, j]
             stop = c[i, j + 1]
-            str = a.strengths[i - 1, j] - a.strengths[i, j]
+            str = a.vorticity[i - 1, j] - a.vorticity[i, j]
             vel += induced_velocity(StraightVortexFilament, 
                 start, stop, str, measurement_loc)
         end
@@ -95,7 +95,7 @@ function induced_velocity(a::VortexRingLattice, measurement_loc::Vector3D)
         for j = 2 : jd
             start = c[i, j]
             stop = c[i + 1, j]
-            str = a.strengths[i, j] - a.strengths[i, j - 1]
+            str = a.vorticity[i, j] - a.vorticity[i, j - 1]
             vel += induced_velocity(StraightVortexFilament, 
                 start, stop, str, measurement_loc)
         end
@@ -104,32 +104,32 @@ function induced_velocity(a::VortexRingLattice, measurement_loc::Vector3D)
     imax, jmax = size(c)
     vel = mapreduce(
         i->induced_velocity(StraightVortexFilament, c[i, 1],
-            c[i+1, 1], a.strengths[i, 1], measurement_loc),
+            c[i+1, 1], a.vorticity[i, 1], measurement_loc),
         +, 1 : id; init=vel)
     vel = mapreduce(
         i->induced_velocity(StraightVortexFilament, c[i, jmax],
-            c[i+1, jmax], -a.strengths[i, jd], measurement_loc),
+            c[i+1, jmax], -a.vorticity[i, jd], measurement_loc),
         +, 1 : id; init=vel)
     vel = mapreduce(
         j->induced_velocity(StraightVortexFilament, c[1, j],
-            c[1, j+1], -a.strengths[1, j], measurement_loc),
+            c[1, j+1], -a.vorticity[1, j], measurement_loc),
         +, 1 : jd; init=vel)
     vel = mapreduce(
         j->induced_velocity(StraightVortexFilament, c[imax, j],
-            c[imax, j+1], a.strengths[id, j], measurement_loc),
+            c[imax, j+1], a.vorticity[id, j], measurement_loc),
         +, 1 : jd; init=vel)
     return vel
 end
 
 function induced_velocity_curl(a::VortexRingLattice)
     curl = zeros(3,3)
-    id, jd = size(a.strengths)
+    id, jd = size(a.vorticity)
     # internal horizontal filaments
     for i = 2 : id
         for j = 1 : jd
             start =c[i, j]
             stop = c[i, j + 1]
-            str = a.strengths[i - 1, j] - a.strengths[i, j]
+            str = a.vorticity[i - 1, j] - a.vorticity[i, j]
             curl += induced_velocity_curl(StraightVortexFilament, 
                 start, stop, str, measurement_loc)
         end
@@ -139,7 +139,7 @@ function induced_velocity_curl(a::VortexRingLattice)
         for j = 2 : jd
             start = c[i, j]
             stop = c[i + 1, j]
-            str = a.strengths[i, j] - a.strengths[i, j - 1]
+            str = a.vorticity[i, j] - a.vorticity[i, j - 1]
             curl += induced_velocity_curl(StraightVortexFilament, 
                 start, stop, str, measurement_loc)
         end
@@ -148,19 +148,19 @@ function induced_velocity_curl(a::VortexRingLattice)
     imax, jmax = size(c)
     curl = mapreduce(
         i->induced_velocity_curl(StraightVortexFilament, c[i, 1],
-        c[i+1, 1], a.strengths[i, 1], measurement_loc),
+        c[i+1, 1], a.vorticity[i, 1], measurement_loc),
         1 : id; init=curl)
     curl = mapreduce(
         i->induced_velocity_curl(StraightVortexFilament, c[i, jmax],
-            c[i+1, jmax], -a.strengths[i, jd], measurement_loc),
+            c[i+1, jmax], -a.vorticity[i, jd], measurement_loc),
         1 : id; init=curl)
     curl = mapreduce(
         j->induced_velocity_curl(StraightVortexFilament, c[1, j],
-        c[1, j+1], -a.strengths[1, j], measurement_loc),
+        c[1, j+1], -a.vorticity[1, j], measurement_loc),
         1 : jd; init=curl)
      curl = mapreduce(
         j->induced_velocity_curl(StraightVortexFilament, c[imax, j],
-        c[imax, j+1], a.strengths[id, j], measurement_loc),
+        c[imax, j+1], a.vorticity[id, j], measurement_loc),
          1 : jd; init=curl)
     return curl
 end
@@ -178,52 +178,29 @@ function steady_forces(a::VortexRingLattice,
         "single arguement of type UNSflow.Vector3D.")
     function asserttmplt(argname, arg, dim)
         @assert((length(arg) == 0) || (length(arg) ==
-<<<<<<< HEAD
-            size(a.strengths, dim)), string("Incorrect length vector ",
+            size(a.vorticity, dim)), string("Incorrect length vector ",
             "passed through keyword argument ", argname, ". Length was ",
             length(arg), ". Should have been ", 
-            size(a.strengths, dim), "."))
-=======
-            size(a.coordinates, dim) - 1), string("Incorrect length vector ",
-            "passed through keyword argument ", argname, ". Length was ",
-            length(arg), ". Should have been ", 
-            size(a.coordinates, dim) - 1, "."))
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
+            size(a.vorticity, dim), "."))
         if any(isnan.(arg)) || any(isinf.(arg))
             @warn string("Vector passed through keyword arguement ",
                 argname, " has NaN or Inf compents.")
         end
     end
-<<<<<<< HEAD
     asserttmplt("i1_filament_strs", i1_filament_strs, 2)
     asserttmplt("imax_filament_strs", imax_filament_strs, 2)
     asserttmplt("j1_filament_strs", j1_filament_strs, 1)
     asserttmplt("jmax_filament_strs", jmax_filament_strs, 1)
-    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.strengths, dim))
+    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.vorticity, dim))
     i1_filament_strs = replacefn(i1_filament_strs, 2)
     imax_filament_strs = replacefn(imax_filament_strs, 2)
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
-=======
-    asserttmplt("i1_filament_strs", i1_filament_strs, 1)
-    asserttmplt("imax_filament_strs", imax_filament_strs, 1)
-    asserttmplt("j1_filament_strs", j1_filament_strs, 2)
-    asserttmplt("jmax_filament_strs", jmax_filament_strs, 2)
-    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
-    i1_filament_strs = replacefn(i1_filament_strs, 1)
-    imax_filament_strs = replacefn(imax_filament_strs, 1)
-    j1_filament_strs = replacefn(j1_filament_strs, 2)
-    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
 
     # AND the actual maths bit:
-    id, jd = size(a.strengths)
+    id, jd = size(a.vorticity)
     c = a.geometry.coordinates
-<<<<<<< HEAD
     forces = map(x->Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
-=======
-    forces = map(Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     force_fn = (sta, sto, str)->steady_force(StraightVortexFilament, sta, sto, 
                                                         str, vel_fn, density)
     # internal horizontal filaments
@@ -231,12 +208,8 @@ function steady_forces(a::VortexRingLattice,
         for j = 1 : jd
             start = c[i, j]
             stop = c[i, j + 1]
-            str = a.strengths[i - 1, j] - a.strengths[i, j]
-<<<<<<< HEAD
+            str = a.vorticity[i - 1, j] - a.vorticity[i, j]
             force = force_fn(start, stop, str)
-=======
-            force = force_fn(start, strop, str)
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
             forces[i-1, j] += force / 2
             forces[i, j] += force / 2
         end
@@ -246,12 +219,8 @@ function steady_forces(a::VortexRingLattice,
         for j = 2 : jd
             start = c[i, j]
             stop = c[i + 1, j]
-            str = a.strengths[i, j] - a.strengths[i, j - 1]
-<<<<<<< HEAD
+            str = a.vorticity[i, j] - a.vorticity[i, j - 1]
             force = force_fn(start, stop, str)
-=======
-            force = force_fn(start, strop, str)
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
             forces[i, j-1] += force / 2
             forces[i, j] += force / 2
         end
@@ -260,31 +229,19 @@ function steady_forces(a::VortexRingLattice,
     imax, jmax = size(c)
     forces[id, :] += map(
         j->force_fn(c[imax, j], c[imax, j+1], 
-            a.strengths[id, j] + imax_filament_strs[j]), 
+            a.vorticity[id, j] + imax_filament_strs[j]), 
         collect(1:jmax-1))
     forces[:, jd] += map(
         i->force_fn(c[i+1, jmax], c[i, jmax], 
-<<<<<<< HEAD
-            a.strengths[i, jd] + jmax_filament_strs[id - i + 1]), 
+            a.vorticity[i, jd] + jmax_filament_strs[id - i + 1]), 
         collect(1:imax-1))
     forces[1, :] += map(
         j->force_fn(c[1, j+1], c[1, j], 
-            a.strengths[1, j] + i1_filament_strs[jd - j + 1]), 
+            a.vorticity[1, j] + i1_filament_strs[jd - j + 1]), 
         collect(1:jmax-1))
     forces[:, 1] += map(
         i->force_fn(c[i, 1], c[i + 1, 1], 
-            a.strengths[i, 1] + j1_filament_strs[i]), 
-=======
-            a.strengths[i, jd] + imax_filament_strs[id - i + 1]), 
-        collect(1:imax-1))
-    forces[1, :] += map(
-        j->force_fn(c[1, j+1], c[1, j], 
-            a.strengths[1, j] + imax_filament_strs[ij - j + 1]), 
-        collect(1:jmax-1))
-    forces[:, 1] += map(
-        i->force_fn(c[i, 1], c[i + 1, 1], 
-            a.strengths[i, 1] + imax_filament_strs[i]), 
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
+            a.vorticity[i, 1] + j1_filament_strs[i]), 
         collect(1:imax-1))
     return forces
 end
@@ -297,35 +254,21 @@ function steady_pressures(a::VortexRingLattice,
     i1_filament_strs::Vector{T}=Vector{Float64}()  ,   # Top edge
     j1_filament_strs::Vector{T}=Vector{Float64}()  ) where T <: Real # Left edge
 
-<<<<<<< HEAD
-    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.strengths, dim))
+    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.vorticity, dim))
     i1_filament_strs = replacefn(i1_filament_strs, 2)
     imax_filament_strs = replacefn(imax_filament_strs, 2)
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
     force = steady_forces(a, vel_fn, density;
-=======
-    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
-    i1_filament_strs = replacefn(i1_filament_strs, 1)
-    imax_filament_strs = replacefn(imax_filament_strs, 1)
-    j1_filament_strs = replacefn(j1_filament_strs, 2)
-    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
-
-    force = steady_forces(a, vel_fn, density,
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         imax_filament_strs=imax_filament_strs,
         jmax_filament_strs=jmax_filament_strs,
         i1_filament_strs=i1_filament_strs,
         j1_filament_strs=j1_filament_strs)
     mareas = areas(a.geometry)
-<<<<<<< HEAD
     mnormals = normals(a.geometry)
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, force))
     press = normal_forces ./ mareas
-=======
-    press = forces ./ mareas
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     return press
 end
 
@@ -338,41 +281,22 @@ function steady_loads(a::VortexRingLattice,
     i1_filament_strs::Vector{T}=Vector{Float64}()  ,   # Top edge
     j1_filament_strs::Vector{T}=Vector{Float64}()  ) where T <: Real # Left edge
 
-<<<<<<< HEAD
-    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.strengths, dim))
+    replacefn = (x, dim)-> length(x) > 0 ? x : zeros(size(a.vorticity, dim))
     i1_filament_strs = replacefn(i1_filament_strs, 2)
     imax_filament_strs = replacefn(imax_filament_strs, 2)
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
     mforces = steady_forces(a, velocity_fn, density;
-=======
-    replacefn = (x, dim)-> length(x) > 0 ? x : size(a.strengths, dim)
-    i1_filament_strs = replacefn(i1_filament_strs, 1)
-    imax_filament_strs = replacefn(imax_filament_strs, 1)
-    j1_filament_strs = replacefn(j1_filament_strs, 2)
-    jmax_filament_strs = replacefn(jmax_filament_strs, 2)
-
-    println(typeof(a))
-    println(typeof(velocity_fn))
-    pres = steady_pressures(a, velocity_fn, density,
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
         imax_filament_strs=imax_filament_strs,
         jmax_filament_strs=jmax_filament_strs,
         i1_filament_strs=i1_filament_strs,  
         j1_filament_strs=j1_filament_strs)
-<<<<<<< HEAD
-=======
-    # We need forces back...
-    mareas = areas(a.geometry)
-    mforces = mareas .* pres
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
     mcents = centres(a.geometry)
     total_forces = sum(mforces)
     moment_contrib = map(
         x->cross(x[1]-measurement_centre, x[2]),
         zip(mcents, mforces))
-<<<<<<< HEAD
     total_moment = sum(moment_contrib)
     # Calculate pressures... meh...
     mareas = areas(a.geometry)
@@ -380,9 +304,6 @@ function steady_loads(a::VortexRingLattice,
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, mforces))
     all_pressures = normal_forces ./ mareas
     return total_forces, total_moment, all_pressures
-=======
-    return total_forces, moment_contrib, pres
->>>>>>> 14419b807d5854ecfc5e86b34c55ef0698ce806e
 end
 
 function state_vector_length(a::VortexRingLattice)
@@ -429,11 +350,11 @@ function state_time_derivative(
 end
 
 function vorticity_vector_length(this::VortexRingLattice)
-    return length(this.strengths)
+    return length(this.vorticity)
 end
 
 function vorticity_vector(this::VortexRingLattice)
-    return vec(this.strengths)
+    return vec(this.vorticity)
 end
 
 function update_using_vorticity_vector!(
@@ -444,7 +365,7 @@ function update_using_vorticity_vector!(
         " Expected a length of ", vorticity_vector_length(this), " but ",
         " was given a vector of length ", length(vort_vect)))
     for i = 1 : length(vort_vect)
-        this.strengths[i] = vort_vect[i]
+        this.vorticity[i] = vort_vect[i]
     end
     return
 end
@@ -455,7 +376,7 @@ function vorticity_vector_velocity_influence(
 
     ret = zeros(3, vorticity_vector_length(this))
     indexes = [(i, j) for 
-        i = 1 : size(this.strengths, 1), j = 1 : size(this.strengths, 2)]
+        i = 1 : size(this.vorticity, 1), j = 1 : size(this.vorticity, 2)]
     indexes = vec(indexes)
     for i = 1 : length(indexes)
         idx = indexes[i]
@@ -467,11 +388,32 @@ function vorticity_vector_velocity_influence(
     return ret
 end
 
+function extract_vorticity_vector_indexes(
+    a::VortexRingLattice,
+    i_ind :: Vector{Int},
+    j_ind :: Vector{Int})
+    
+    ni, nj = size(a.vorticity)
+    for i = 1 : length(i_ind)
+        @assert(0 < i_ind[i] <= ni, string("Tried to extract invalid i index",
+        " from VortexRingLattice. Desired value ", i_ind[i], " at i_ind[",
+        i, "] exceeded max index of ", ni, "."))
+    end
+    for j = 1 : length(j_ind)
+        @assert(0 < j_ind[j] <= nj, string("Tried to extract invalid j index",
+        " from VortexRingLattice. Desired value ", j_ind[j], " at j_ind[",
+        j, "] exceeded max index of ", nj, "."))
+    end
+    lookup = [ni * (j-1) + i for i = 1 : ni, j = 1 : nj]
+    ret = map(x->lookup[x[1], x[2]], [(i, j) for i in i_ind, j in j_ind])
+    return ret
+end
+
 #= CONVERSION FUNCTIONS ------------------------------------------------------=#
 function Base.convert(::Type{Matrix{VortexRing}}, a::VortexRingLattice)
-    ret = Matrix{VortexRing}(undef, size(a.strengths))
+    ret = Matrix{VortexRing}(undef, size(a.vorticity))
     g = a.geometry.coordinates
-    s = a.strengths
+    s = a.vorticity
     ret = map(
         x->VortexRing(g[x[1]+1, x[2]], g[x[1]+1, x[2]+1], g[x[1], x[2]+1],
             g[x[1], x[2]], s[x[1], x[2]] ),
@@ -483,3 +425,4 @@ end
 function Base.convert(::Type{Vector{VortexRing}}, a::VortexRingLattice)
     return vec(Base.convert(Matrix{VortexRing}, a))
 end
+
