@@ -130,7 +130,7 @@ using some form of ODE solver.
 """
 function update_using_state_vector!(
     this::Vorticity3D,
-    state_vect::Vector{Float64})
+    state_vect::Vector{T}) where T <: Real
     @assert(typeof(this) != VortexParticle3D, "Wrong function dispatched!?")
     @assert(!(typeof(this) <: Vorticity3DCollector), 
         "Wrong function dispatched!?")
@@ -192,7 +192,7 @@ Update the vorticities within a Vorticity3D using a vector.
 """
 function update_using_vorticity_vector!(
     this::Vorticity3D,
-    vort_vect::Vector{Float64})
+    vort_vect::Vector{T}) where T <: Real
 
     error("update_using_vorticity_vector!(a::Vorticity3D, ",
         "vort_vect::Vector{Float64}) has not been reimlemented for ",

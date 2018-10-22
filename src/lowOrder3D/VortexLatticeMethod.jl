@@ -27,18 +27,17 @@
 ------------------------------------------------------------------------------=#
 
 mutable struct VortexLatticeMethod
-    wing_geometry :: BilinearQuadSurf
     free_stream :: Vector3D
 
-    wing_aerodynamic :: VortexRingLattice
-    wake_aerodynamic :: LinkedVorticity3D
+    variable_aero :: Vorticity3DSimpleCollector
+    bc_geometry :: Vector{BilinearQuadSurf}
 
     function VortexLatticeMethod(
         wing_geometry :: BilinearQuadSurf, 
         free_stream :: Vector3D,
         wake_positions :: Vector{T}) where T <: Real
 
-        wing_aero = VortexRingLattice(wing_geometry)
+        wing_aero_original = VortexRingLattice(wing_geometry)
         # The wake aero is er... fun to generate.
         ni, nj = size(wing_geometry)
         wake_points = 
@@ -55,30 +54,41 @@ mutable struct VortexLatticeMethod
         end
         wake_aero = VortexRingLattice(BilinearQuadSurf(wake_points))
         transform_mat = trailing_edge_to_wake_vorticity_transform_matrix(
-            wing_aero, wake_aero)
-        wake_linked = LinkedVorticity3D(wake_aero, wing_aero, transform_mat)
-        new(wing_geometry, free_stream, wing_aero, wake_linked)
+            wing_aero_original, wake_aero)
+        wake_child = LinkedVorticity3DChild(wake_aero)
+        aero = Vorticity3DSimpleCollector(
+            LinkedVorticity3DParent(wing_aero_original, wake_child, 
+                transform_mat),
+            wake_child
+        )
+
+        new(free_stream, aero, [wing_geometry])
     end
 end
 
 function solve!(a::VortexLatticeMethod)
-    wing_normals = vec(normals(a.wing_geometry))
-    wing_centres = vec(centres(a.wing_geometry))
+    s_normals = mapreduce(x->vec(normals(x)), vcat, a.bc_geometry)
+    s_centres = mapreduce(x->vec(centres(x)), vcat, a.bc_geometry)
     
-    wing_mtrx = normal_velocity_influence_matrix(a.wing_aerodynamic, 
-        wing_centres, wing_normals)
-    wake_mtrx = normal_velocity_influence_matrix(a.wake_aerodynamic,
-        wing_centres, wing_normals)
+    @assert(length(s_normals) == vorticity_vector_length(a.variable_aero),
+        string("VortexLatticeMethod: ",
+            "The number of geometric constraints does not match the ",
+            "number of variables in the system. Did you forget to add to ",
+            "the boundary conditions of the problem? There are ",
+            length(s_normals), " constraint points/normals and ",
+            vorticity_vector_length(a.variable_aero), " variables."))
+
+    mtrx = normal_velocity_influence_matrix(a.variable_aero, 
+        s_centres, s_normals)
 
     fs_vector = map(
         x->dot(a.free_stream, x[2]), 
-        zip(wing_centres, wing_normals))
-
-    # (wake_mtrx + wing_mtrx)*solution + fs_vector = 0
-    soln = (wake_mtrx + wing_mtrx) \ (-fs_vector)
+        zip(s_centres, s_normals))
+        
+    # mtrx*solution + fs_vector = 0
+    soln = (mtrx) \ (-fs_vector)
     
-    update_using_vorticity_vector!(a.wing_aerodynamic, soln)
-    update_using_vorticity_vector!(a.wake_aerodynamic, soln)
+    update_using_vorticity_vector!(a.variable_aero, soln)
     return
 end
 
@@ -87,11 +97,11 @@ function relax_wake!(
     a::VortexLatticeMethod; 
     relaxation_factor::T=0.1) where T <: Real
 
-    points = a.wake_aerodynamic.geometry.coordinates
-    for i = 2 : size(a.wake_aerodynamic.geometry.coordinates, 1)
+    points = a.variable_aero[2].geometry.coordinates
+    for i = 2 : size(points, 1)
         vels = map(
-            x-> induced_velocity(a.wake_aerodynamic, x) + 
-                induced_velocity(a.wing_aerodynamic, x) + a.free_stream,
+            x-> induced_velocity(a.variable_aero[2], x) + 
+                induced_velocity(a.variable_aero[1], x) + a.free_stream,
             points[i, :])
         # Forward difference:
         comparison_vect = unit.(points[i, :] - points[i-1, :])
@@ -99,8 +109,8 @@ function relax_wake!(
         moves = map(
             x->(x[1] - dot(x[1], x[2]) * x[2]) * relaxation_factor, 
             zip(vels, comparison_vect))
-        for j = i : size(a.wake_aerodynamic.geometry.coordinates, 1)
-            a.wake_aerodynamic.geometry.coordinates[j,:] += moves
+        for j = i : size(points, 1)
+            points[j,:] += moves
         end
     end
     return
@@ -124,17 +134,4 @@ function trailing_edge_to_wake_vorticity_transform_matrix(
         wake_transform[wake_idxs, wing_te_vort_vec_idxs[j]] .= 1
     end
     return wake_transform
-#=
-    wake_veclen = vorticity_vector_length(wake_lattice)
-    ni, nj = size(wing_lattice.geometry)
-    nk, nl = size(wake_lattice.geometry)
-    wake_trnsform = zeros( nk * nl, ni * nj )
-    for i = 1 : nj  # Once for each TE ring on Wing
-        irange_start = (i - 1) * nk + 1
-        irange_end = i * nk
-        j_pos = i * ni
-        wake_trnsform[irange_start:irange_end, j_pos] .= 1
-    end
-    return wake_trnsform
-=#
 end

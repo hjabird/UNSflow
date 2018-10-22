@@ -230,11 +230,11 @@ function update_using_vorticity_vector!(
     vort_vect::Vector{Float64})
 
     lens = map(vorticity_vector_length, this.children)
-    @assert(mapreduce(x, +, lens, init=0) == length(vort_vect),
+    @assert(sum(lens) == length(vort_vect),
         "Input vorticity vector was the incorrect length.")
     offset = 1
     for i = 1 : length(this.children)
-        update_using_vorticity_vector(
+        update_using_vorticity_vector!(
             this.children[i],
             vort_vect[offset : offset + lens[i] - 1])
         offset += lens[i]
@@ -253,6 +253,7 @@ function vorticity_vector_velocity_influence(
     for i = 1 : length(this.children)
         v[:, offset : offset + lens[i] - 1] =
             vorticity_vector_velocity_influence(this.children[i], mes_pnt)
+        offset += lens[i]
     end
     return v
 end
