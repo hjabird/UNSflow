@@ -24,7 +24,7 @@ function vortex_particle_ring(
     @assert(radius > 0)
     @assert(abs(normal_to_ring) > 0)
     @assert(num_particles >= 3)
-    particles = Array{VortexParticle3D, 1}(undef, num_particles)
+    particles = Array{UNSflow.VortexParticle3D, 1}(undef, num_particles)
 
     # Angular definition
     dtheta = 2 * pi / num_particles
@@ -40,22 +40,22 @@ function vortex_particle_ring(
 
     # Generate a plane normal to n described by two orthogonal unit vectors
     # a and b.
-    n = unit(normal_to_ring)
+    n = UNSflow.unit(normal_to_ring)
     if n[3] != 0
-        a = Vector3D(1, 1, (n[1] + n[2])/n[3])
+        a = UNSflow.Vector3D(1, 1, (n[1] + n[2])/n[3])
     elseif n[2] != 0
-        a = Vector3D(1, (n[1] + n[3])/n[2], 1)
+        a = UNSflow.Vector3D(1, (n[1] + n[3])/n[2], 1)
     elseif n[1] != 0
-        a = Vector3D((n[2] + n[3])/n[1], 1, 1)
+        a = UNSflow.Vector3D((n[2] + n[3])/n[1], 1, 1)
     end
-    unit!(a)
-    b = unit(cross(a, n))
+    UNSflow.unit!(a)
+    b = UNSflow.unit(UNSflow.cross(a, n))
     # Place particles in the new plane
     for i = 1 : num_particles
-        from_centre = Vector3D(coords[1, i] * a + coords[2, i] * b)
-        p = VortexParticle3D(
+        from_centre = UNSflow.Vector3D(coords[1, i] * a + coords[2, i] * b)
+        p = UNSflow.VortexParticle3D(
             centre + from_centre, # coord
-            particle_strength * unit(cross(from_centre, n)), # vorticity
+            particle_strength * UNSflow.unit(UNSflow.cross(from_centre, n)), # vorticity
             particle_size, # size
             kernel
             )
