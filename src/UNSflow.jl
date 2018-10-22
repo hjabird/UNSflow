@@ -164,7 +164,6 @@ include("lowOrder2D/postprocess.jl")         # postprocessing functions
 # include("lowOrder3D/calcs.jl")               # calculation functions
 # include("lowOrder3D/solvers.jl")             # solver methods
 # include("lowOrder3D/postprocess.jl")         # postprocessing functions
-include("lowOrder3D/ThreadWork.jl")
 include("lowOrder3D/Vector3D.jl")
 include("lowOrder3D/DiscreteGeometry3D.jl")
 include("lowOrder3D/CoordinateTransform3D.jl")

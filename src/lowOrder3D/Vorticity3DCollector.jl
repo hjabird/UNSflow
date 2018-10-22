@@ -133,17 +133,10 @@ function euler!(
     a::Vorticity3DCollector,
     b::Vorticity3D,
     dt::Real)
-    # So we can call the update methods of our children...
     cpy = deepcopy(a)
-    local _euler_local_func
-    function _euler_local_func(vort_obj::Vorticity3D)
-        euler!(vort_obj, b, dt)
-        return
-    end
-    apply_to_tree(_euler_local_func, cpy, Vorticity3DCollector)
-    #=for child in cpy.children
+    for child in cpy.children
         euler!(child, b, dt)
-    end=#
+    end
     a.children = cpy.children
     return
 end
@@ -309,4 +302,8 @@ else # Version 0.6 or older.
     function Base.done(a::Vorticity3DCollector, state::Integer)
         return state > length(a)
     end
+end
+
+function Base.unsafe_getindex(a::Vorticity3DCollector, i::Integer)
+    return Base.unsafe_getindex(a.children, i)
 end
