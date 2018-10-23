@@ -23,7 +23,7 @@
     FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
-
+import WriteVTK
 
 mutable struct UnstructuredMesh
     pointdata :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}
@@ -107,9 +107,9 @@ function add_pointdata!(a::UnstructuredMesh, point_idx::Int,
     data_name::String, value::Union{Real, Vector3D})
 
     @assert(0 < point_idx < length(a.points), string("Index argument",
-    " had value greater than the length of the points vector. ",
-    "0 < idx < length(point vector). Argument was ", point_idx,
-    " and length(::UnstructuredMesh.cells) was ", length(a.points), "."))
+        " had value greater than the length of the points vector. ",
+        "0 < idx < length(point vector). Argument was ", point_idx,
+        " and length(::UnstructuredMesh.cells) was ", length(a.points), "."))
 
     if haskey(a.pointdata, data_name)
         if length(a.pointdata[data_name]) > 0
@@ -138,6 +138,40 @@ function add_pointdata!(a::UnstructuredMesh, point_idx::Int,
     return # EXIT 2
 end
 
+function to_vtk_file(a::UnstructuredMesh, path::String)
+    cells = Vector{WriteVTK.MeshCell}(undef, length(a.cells))
+    # Because of the way we've directly stored the UNSflow.DiscreteGeometry3D
+    # we have the pain of working out the indices of points...
+    points = convert(Matrix{Float64}, a.points)
+    for i = 1 : length(cells)
+        pt_idxs = Vector{Int64}()
+        coordinates = coords(a.cells[i])
+        for j = 1: length(coordinates)
+            push!(pt_idxs, findfirst(x->x === coordinates[j], points))
+        end
+        cells[i] = WriteVTK.MeshCell(vtk_cell_type(a.cells[i]), pt_idxs)
+    end
+    vtkfile = WriteVTK.vtk_grid(path, points, cells)
+    # Add celldata and pointdata.
+    for dataset in a.celldata
+        dataname = dataset[1]
+        data = dataset[2]
+        if typeof(data) == Vector{Vector3D}
+            data = convert(Matrix{Float64}, data)
+        end
+        vtkfile = WriteVTK.vtk_cell_data(vtkfile, data, dataname)
+    end
+    for dataset in a.pointdata
+        dataname = dataset[1]
+        data = dataset[2]
+        if typeof(data) == Vector{Vector3D}
+            data = convert(Matrix{Float64}, data)
+        end
+        vtkfile = WriteVTK.vtk_cell_data(vtkfile, data, dataname)
+    end
+    outfile = WriteVTK.vtk_save(vtk_file)
+    return outfile
+end
 
 function acceptable_cell_type(Type{UnstructuredMesh}, a::DiscreteGeometry3D)
     typ = typeof(a)
@@ -152,4 +186,20 @@ function acceptable_cell_type(Type{UnstructuredMesh}, a::DiscreteGeometry3D)
     else
         return false
     end 
+end
+
+function vtk_cell_type(a::DiscreteGeometry3D)
+    error("VTK cell type of ", typeof(a), " has not been defined.")
+end
+function vtk_cell_type(a::Point3D)
+    return WriteVTK.VTKCellTypes.VTK_VERTEX
+end
+function vtk_cell_type(a::Line2)
+    return WriteVTK.VTKCellTypes.VTK_LINE
+end
+function vtk_cell_type(a::PolyLine2)
+    return WriteVTK.VTKCellTypes.VTK_POLY_LINE
+end
+function vtk_cell_type(a::BilinearQuad)
+    return WriteVTK.VTKCellTypes.VTK_QUAD
 end
