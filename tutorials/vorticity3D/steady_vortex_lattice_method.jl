@@ -33,12 +33,12 @@ let
 # STEP 1 : Define a wing. ------------------------------------------------------
 # This is done by using equation surf. We take x=-1 as the leading edge, x=1
 # as the trailing edge. 
-aoa = 0.1
-aspect_ratio = 4
+aoa = 4 * pi / 180
+aspect_ratio = 3
 # Rectangular:
-#surf_fn = x->UNSflow.Vector3D(x[1]/2, x[2]*aspect_ratio/2, 0)
+surf_fn = x->UNSflow.Vector3D(x[1]/2, x[2]*aspect_ratio/2, 0)
 # Or perhaps elliptic:
-surf_fn = x->UNSflow.Vector3D(sqrt(1- x[2]^2) * x[1]/2, x[2]*aspect_ratio/2, 0)
+#surf_fn = x->UNSflow.Vector3D(sqrt(1- x[2]^2) * x[1]/2, x[2]*aspect_ratio/2, 0)
 # Apply the angle of attack:
 surf_fn_aoa = x->UNSflow.rotate_about_y(surf_fn(x), aoa)
 # The generate the surface and discretise the surface:
@@ -68,7 +68,7 @@ end
 ind_vel_fn = x -> free_stream + 
     UNSflow.induced_velocity(problem.variable_aero, x)
 # We can calculate some useful stuff using steady_loads:
-force, moment, pressure = UNSflow.steady_loads(
+force, moment, pressure_wing = UNSflow.steady_loads(
     problem.variable_aero[1], 
     ind_vel_fn; 
     # The wing vortex lattice is overlapped by that of the wake, so we need to 
@@ -83,9 +83,17 @@ println("Force coeffs ", 2 * force /
 println("Moments are ", moment)
 
 # STEP 5: Output to VTK file ---------------------------------------------------
-pressure = vcat(vec(pressure), 
-                zeros(length(problem.variable_aero[2].vorticity)))
+pressure_wake = zeros(length(problem.variable_aero[2].vorticity))
 
+mesh = UNSflow.UnstructuredMesh()
+extra_data = UNSflow.MeshDataLinker()
+UNSflow.add_celldata!(extra_data, problem.variable_aero[1], "Pressure", pressure_wing)
+UNSflow.add_celldata!(extra_data, problem.variable_aero[2], "Pressure", pressure_wake)
+push!(mesh, problem.variable_aero)
+UNSflow.add_data!(mesh, extra_data)
+UNSflow.to_vtk_file(mesh, "output/steady_vortex_lattice")
+
+                #=
 # And plot the shape of stuff:
 points, cells = UNSflow.to_VtkMesh(
     convert(Vector{UNSflow.BilinearQuad}, problem.bc_geometry[1]))
@@ -99,5 +107,5 @@ vorticity = vcat(
 WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
 WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure")
 outfiles = WriteVTK.vtk_save(vtkfile)
-
+=#
 end #let

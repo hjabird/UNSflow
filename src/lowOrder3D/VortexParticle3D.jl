@@ -191,4 +191,30 @@ function vorticity_vector_velocity_influence(
     this.vorticity = old_vorticity;
     return v
 end
+
+function Base.push!(a::UnstructuredMesh, b::VortexParticle3D, 
+    controldict=Dict{String, Any}())
+    cell_idx, point_idx = add_cell!(a, b.geometry)
+    add_celldata!(a, cell_idx, "Vorticity",b.vorticity)
+    add_pointdata!(a, point_idx[1], "Vorticity", b.vorticity)
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::VortexParticle3D, 
+    dataname::String, data::Union{Float64, Vector3D})
+
+    point = b.geometry
+    add_celldata!(a, dataname, point, data)
+    add_pointdata!(a, dataname, point.coord, data)
+    return
+end
+
+function add_pointdata!(a::MeshDataLinker, b::VortexParticle3D, 
+    dataname::String, data::Union{Float64, Vector3D})
+    
+    point = b.geometry
+    add_celldata!(a, dataname, point, data)
+    add_pointdata!(a, dataname, point.coord, data)
+    return
+end
 #= END VortexParticle3D --------------------------------------------------=#

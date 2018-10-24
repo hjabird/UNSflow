@@ -26,22 +26,22 @@
 
 mutable struct VortexRing <: Vorticity3D
     geometry :: PolyLine2
-    strength :: Float64
+    vorticity :: Float64
 
     function VortexRing(
         corner1 :: Vector3D,
         corner2 :: Vector3D,
         corner3 :: Vector3D,
         corner4 :: Vector3D,
-        strength :: Float64
+        vorticity :: Float64
         )
         return new(PolyLine2([corner1, corner2, corner3, corner4, corner1]),
-            strength)
+            vorticity)
     end
 
-    function VortexRing(quad :: BilinearQuad, strength :: Float64)
+    function VortexRing(quad :: BilinearQuad, vorticity :: Float64)
         return new(PolyLine2([quad.c1, quad.c2, quad.c3, quad.c4, quad.c1]),
-            strength)
+            vorticity)
     end
 end
 
@@ -54,10 +54,10 @@ function Base.convert(
     a::VortexRing)
     b = Vector{StraightVortexFilament}(undef, 4)
     coords = a.geometry.coords
-    b[1] = StraightVortexFilament(coords[1], coords[2], a.strength)
-    b[2] = StraightVortexFilament(coords[2], coords[3], a.strength)
-    b[3] = StraightVortexFilament(coords[3], coords[4], a.strength)
-    b[4] = StraightVortexFilament(coords[4], coords[1], a.strength)
+    b[1] = StraightVortexFilament(coords[1], coords[2], a.vorticity)
+    b[2] = StraightVortexFilament(coords[2], coords[3], a.vorticity)
+    b[3] = StraightVortexFilament(coords[3], coords[4], a.vorticity)
+    b[4] = StraightVortexFilament(coords[4], coords[1], a.vorticity)
     return b
 end
 
@@ -152,4 +152,47 @@ function vorticity_vector_velocity_influence(
     this.vorticity = old_vorticity;
     return v
 end
-#= END VortexRing ------------------------------------------------------=#
+
+#= Mesh interaction ----------------------------------------------------------=#
+function Base.push!(
+    a::UnstructuredMesh, 
+    b::VortexRing, 
+    controldict=Dict{String, Any}())
+
+    if haskey(controldict, "VortexRingAsFilaments") &&
+        controldict["VortexRingAsFilaments"] == true
+        fils = convert(Vector{StraightVortexFilament}, b)
+        for fil in fils
+            push!(a, fil, controldict)
+        end
+    else # As a surface...
+        blsurf = BilinearQuad(b.c1, b.c2, b.c3, b.c4)
+        cellidx, pointidx = add_cell!(a, blsurf)
+        add_celldata!(a, cell_idx, "Vorticity", vorticity(b))
+        add_celldata!(a, cell_idx, "Filament_vorticity", b.vorticity)
+    end
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::VortexRing, 
+    dataname::String, data::Union{Float64, Vector3D})
+
+    geom1 = b.geometry
+    geom2 = BilinearQuad(coords(b.geometry)[1:4])
+    add_celldata!(a, dataname, geom1, data)
+    add_celldata!(a, dataname, geom2, data)
+    return
+end
+
+function add_pointdata!(a::MeshDataLinker, b::VortexRing, 
+    dataname::String, data::Union{Vector{Float64}, Vector{Vector3D}})
+
+    points = coords(b.geometry)[1:4]
+    @assert(length(data) == 4, string("The length of the data vector",
+        " should be 4. It was ", length(data), "."))
+    for v in zip(data, points)
+        add_pointdata!(a, dataname, v[2], v[1])
+    end
+    return
+end
+#= END VortexRing ------------------------------------------------------------=#

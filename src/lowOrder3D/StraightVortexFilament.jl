@@ -248,4 +248,32 @@ function steady_force(
         +, vels, init=Vector3D(0,0,0))
     return force
 end
+
+function Base.push!(a::UnstructuredMesh, b::StraightVortexFilament, 
+    controldict=Dict{String, Any}())
+    cell_idx, p_idx = add_cell!(a, b.geometry)
+    add_celldata!(a, cell_idx, "Filament_vorticity", b.vorticity)
+    add_celldata!(a, cell_idx, "Vorticity", vorticity(b))
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::StraightVortexFilament, 
+    dataname::String, data::Union{Float64, Vector3D})
+
+    geom = b.geometry
+    add_celldata!(a, dataname, geom, data)
+    return
+end
+
+function add_pointdata!(a::MeshDataLinker, b::StraightVortexFilament, 
+    dataname::String, data::Union{Vector{Float64}, Vector{Vector3D}})
+
+    points = coords(b.geometry)
+    @assert(length(data) == 2, string("The length of the data vector",
+        " should be 2. It was ", length(data), "."))
+    for v in zip(data, points)
+        add_pointdata!(a, dataname, v[2], v[1])
+    end
+    return
+end
 #= END StraightVortexFilament ------------------------------------------=#

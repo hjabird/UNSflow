@@ -158,7 +158,7 @@ function induced_velocity_curl(a::VortexRingLattice)
         j->induced_velocity_curl(StraightVortexFilament, c[1, j],
         c[1, j+1], -a.vorticity[1, j], measurement_loc),
         1 : jd; init=curl)
-     curl = mapreduce(
+    curl = mapreduce(
         j->induced_velocity_curl(StraightVortexFilament, c[imax, j],
         c[imax, j+1], a.vorticity[id, j], measurement_loc),
          1 : jd; init=curl)
@@ -426,3 +426,129 @@ function Base.convert(::Type{Vector{VortexRing}}, a::VortexRingLattice)
     return vec(Base.convert(Matrix{VortexRing}, a))
 end
 
+function Base.convert(
+    ::Type{Vector{StraightVortexFilament}}, 
+    a::VortexRingLattice)
+
+    id, jd = size(a.vorticity)
+    c = a.geometry.coordinates
+    fils = Vector{StraightVortexFilament}(undef, id * jd * 2 + id + jd)
+    offset = 1
+    # internal horizontal filaments
+    for i = 2 : id
+        for j = 1 : jd
+            start = c[i, j]
+            stop = c[i, j + 1]
+            str = a.vorticity[i - 1, j] - a.vorticity[i, j]
+            fils[offset] = StraightVortexFilament(start, stop, str)
+            offset += 1
+        end
+    end
+    # internal vertical filaments
+    for i = 1 : id
+        for j = 2 : jd
+            start = c[i, j]
+            stop = c[i + 1, j]
+            str = a.vorticity[i, j] - a.vorticity[i, j - 1]
+            fils[offset] = StraightVortexFilament(start, stop, str)
+            offset += 1
+        end
+    end
+    # external horizontal filaments
+    imax, jmax = size(c)
+    fils[offset : offset + id - 1] = map(
+        i->StraightVortexFilament(c[i, 1], c[i+1, 1], a.vorticity[i, 1]),1 : id)
+    offset += id
+    fils[offset : offset + id - 1] = map(
+        i->StraightVortexFilament(c[i, jmax], c[i+1, jmax],-a.vorticity[i, jd]),
+        1 : id)
+    offset += id
+    fils[offset : offset + jd - 1] = map(
+        j->StraightVortexFilament(c[1, j], c[1, j+1], -a.vorticity[1, j]),
+        1 : jd)
+    offset += jd
+    fils[offset : offset + jd - 1] = map(
+        j->StraightVortexFilament(c[imax, j], c[imax, j+1], a.vorticity[id, j]),
+        1 : jd)
+    return fils
+end
+
+function Base.push!(a::UnstructuredMesh, b::VortexRingLattice, 
+    controldict=Dict{String, Any}())
+
+    if haskey(controldict, "VortexRingLatticeAsRings") &&
+        controldict["VortexRingLatticeAsRings"] == true
+        rings = convert(Vector{VortexRing}, b)
+        for ring in rings
+            push!(a, ring, controldict)
+        end
+    elseif haskey(controldict, "VortexRingLatticeAsFilaments") &&
+        controldict["VortexRingLatticeAsFilaments"] == true
+
+        fils = convert(Vector{StraightVortexFilament}, b)
+        for fil in fils
+            push!(a, fil, controldict)
+        end
+    else # DEFAULT
+        quads = convert(Matrix{BilinearQuad}, b.geometry)
+        idxs = [(i, j) for i = 1 : size(quads, 1), j = 1 : size(quads, 2)]
+        for idx in idxs
+            cidx, pidx = add_cell!(a, quads[idx[1], idx[2]])
+            add_celldata!(a, cidx, "Filament_vorticity", 
+                b.vorticity[idx[1], idx[2]])
+        end
+    end
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::VortexRingLattice, 
+    dataname::String, data::Union{Matrix{Float64}, Matrix{Vector3D}})
+
+    @assert(size(data) == size(b.geometry), 
+        string("size(data) must equal the size(geometry) of the vortex",
+            " lattice. size(data) = ", size(data), " and size(geometry) = ",
+            size(b.geometry), "."))
+    add_celldata!(a, b, dataname, vec(data))
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::VortexRingLattice, 
+    dataname::String, data::Union{Vector{Float64}, Vector{Vector3D}})
+
+    @assert(length(data) == length(b.geometry), 
+        string("length(data) must equal the length(geometry) of the vortex",
+            " lattice. length(data) = ",length(data)," and length(geometry) = ",
+            length(b.geometry), "."))
+    
+    geom1 = convert(Vector{BilinearQuad}, b.geometry)
+    geom2 = vec(map(x->x.geometry, convert(Vector{VortexRing}, b)))
+    for i = 1 : length(geom1)
+        add_celldata!(a, dataname, geom1[i], data[i])
+        add_celldata!(a, dataname, geom2[i], data[i])
+    end
+    return
+end
+
+function add_pointdata!(a::MeshDataLinker, b::VortexRingLattice, 
+    dataname::String, data::Union{Matrix{Float64}, Matrix{Vector3D}})
+
+    @assert(size(data) == size(b.geometry.coordinates), 
+        string("size(data) must equal the size(geometry.coordinates) of the",
+            " vortex lattice. size(data) = ", size(data), 
+            " and size(geometry) = ", size(b.geometry.coordinates), "."))
+    add_pointdata!(a, b, dataname, vec(data))
+end
+
+function add_pointdata!(a::MeshDataLinker, b::VortexRingLattice, 
+    dataname::String, data::Union{Vector{Float64}, Vector{Vector3D}})
+
+    points = vec(b.geometry.coordinates)
+    @assert(length(data) == length(b.coordinates), 
+        string("The length of the data vector should was ", length(data),
+        " which did not match length(VortexRingLattice.coordinates) =  ",
+        length(b.geometry.coordinates)))
+    for v in zip(data, points)
+        add_pointdata!(a, dataname, v[2], v[1])
+    end
+    return
+end

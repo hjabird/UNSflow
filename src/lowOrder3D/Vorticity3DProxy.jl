@@ -73,6 +73,14 @@ function Base.setproperty!(a::Vorticity3DProxy, name::Symbol, value)
     end
 end
 
+function source_object(a::Vorticity3DProxy)
+    if typeof(a.source_object) <: Vorticity3DProxy
+        return source_object(a.source_object)
+    else
+        return a.source_object
+    end
+end
+
 # The mundane automatic redirection of Vorticity3D calls... --------------------
 function centre(a::Vorticity3DProxy)
     return centre(a.source_object)
@@ -255,4 +263,38 @@ function Base.iterate(a::Vorticity3DProxy, state=1)
         error(string("Source object of type ", typeof(a.source_object),
             "has no method iterate. Are you sure it is iterable?"))
     end
+end
+
+function Base.push!(a::UnstructuredMesh, b::Vorticity3DProxy, 
+    controldict=Dict{String, Any}())
+    push!(a, b.source_object, controldict)
+    return
+end
+
+function add_celldata!(a::MeshDataLinker, b::Vorticity3DProxy, 
+    dataname::String, data::Any)
+
+    source = source_object(b)
+    @assert(hasmethod(add_celldata!, Tuple{MeshDataLinker, 
+        typeof(source), String, typeof(data)}), 
+        string("Vorticity3DProxy could not forward call to add_celldata! ",
+            "since no appropriate function was available: no method ",
+            "add_celldata!(::MeshDataLinker, ::", typeof(source), 
+            ", ::String, ::", typeof(data), ")."))
+    add_celldata!(a, source, dataname, data)
+    return
+end
+
+function add_pointdata!(a::MeshDataLinker, b::Vorticity3DProxy, 
+    dataname::String, data::Any)
+
+    source = source_object(b)
+    @assert(hasmethod(add_pointdata!, Tuple{MeshDataLinker, 
+        typeof(source), String, typeof{data}}), 
+        string("Vorticity3DProxy could not forward call to add_pointdata! ",
+            "since no appropriate function was available: no method ",
+            "add_pointdata!(::MeshDataLinker, ::", typeof(source), 
+            ", ::String, ::", typeof(data), ")."))
+    add_pointdata!(a, source, dataname, data)
+    return
 end

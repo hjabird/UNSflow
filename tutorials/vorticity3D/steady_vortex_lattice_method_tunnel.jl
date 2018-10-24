@@ -34,8 +34,8 @@ let
 # STEP 1 : Define a wing. ------------------------------------------------------
 # This is done by using equation surf. We take x=-1 as the leading edge, x=1
 # as the trailing edge. 
-aoa = 0.1
-aspect_ratio = 4
+aoa = 4 * pi / 180
+aspect_ratio = 3
 # Rectangular:
 surf_fn = x->UNSflow.Vector3D(x[1]/2, x[2]*aspect_ratio/2, 0)
 # Or perhaps elliptic:
@@ -50,11 +50,11 @@ wing_geom = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf,
                                                 chordwise_disc, spanwise_disc)
 
 # Lets define some tunnel side walls
-offset = 1.1
+offset = 4/3
 wallr_fn = x->UNSflow.Vector3D(x[1]*5+3, aspect_ratio * 0.5 * offset, x[2]*2)
 walll_fn = x->wallr_fn(x) + UNSflow.Vector3D(0, -offset * aspect_ratio, 0)
-wallb_fn = x->UNSflow.Vector3D(x[1]*5+3, aspect_ratio * 0.5 * offset * x[2], -2)
-wallt_fn = x->UNSflow.Vector3D(x[1]*5+3, aspect_ratio * 0.5 * offset * x[2],  2)
+wallb_fn = x->UNSflow.Vector3D(x[1]*5+3, aspect_ratio * 0.5 * offset * x[2], -1.7)
+wallt_fn = x->UNSflow.Vector3D(x[1]*5+3, aspect_ratio * 0.5 * offset * x[2],  1.7)
 wallr_geom = UNSflow.discretise(UNSflow.EquationSurf(wallr_fn),
     UNSflow.BilinearQuadSurf, collect(-1:0.1:1), collect(-1:0.1:1))
 walll_geom = UNSflow.discretise(UNSflow.EquationSurf(walll_fn),

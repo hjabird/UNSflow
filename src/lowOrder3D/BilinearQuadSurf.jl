@@ -81,6 +81,11 @@ function Base.size(a::BilinearQuadSurf)
     return (i-1, j-1)
 end
 
+function Base.length(a::BilinearQuadSurf)
+    i, j = size(a.coordinates)
+    return (i-1)*(j-1)
+end
+
 function Base.convert(::Type{BilinearQuad}, a::BilinearQuadSurf,
     xidx::Int, yidx::Int)
 

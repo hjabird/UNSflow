@@ -2,6 +2,8 @@
     UnstructuredMesh.jl
 
     Representation of an unstructured mesh with celldata & pointdata.
+    It is expected that classes will add their own methods to add objects to 
+    the mesh.
 
     Initial code: HJAB 2018
 
@@ -26,14 +28,14 @@
 import WriteVTK
 
 mutable struct UnstructuredMesh
-    pointdata :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}
-    celldata  :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}
+    pointdata :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}}
+    celldata  :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}}
     points :: Vector{Vector3D}
     cells  :: Vector{DiscreteGeometry3D}
 
     function UnstructuredMesh(
-        pointdata :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}},
-        celldata  :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}},
+        pointdata :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}},
+        celldata  :: Dict{String, Union{Vector{Float64}, Vector{Vector3D}}},
         points :: Vector{Vector3D},
         cells  :: Vector{DiscreteGeometry3D})
         new(pointdata, celldata, points, cells)
@@ -42,10 +44,20 @@ end
 
 function UnstructuredMesh()
     return UnstructuredMesh(
-        Dict{String, Union{Vector{Float64}, Vector{Vector3D}}(),
-        Dict{String, Union{Vector{Float64}, Vector{Vector3D}}(), 
+        Dict{String, Union{Vector{Float64}, Vector{Vector3D}}}(),
+        Dict{String, Union{Vector{Float64}, Vector{Vector3D}}}(), 
         Vector{Vector3D}(), 
         Vector{DiscreteGeometry3D}())
+end
+
+function Base.push!(a::UnstructuredMesh, 
+    b::Any, 
+    controldict=Dict{String, Any}())
+    error("Type ", typeof(b), " has not provided a method to automatically ",
+        "add it and its attributes to the UNSflow.UnstructuredMesh. You'll ",
+        "have to use the add_cell!, add_pointdata!, add_celldata! based",
+        " API.")
+    return
 end
 
 """
@@ -60,7 +72,7 @@ function add_cell!(a::UnstructuredMesh, to_add::DiscreteGeometry3D)
         "BilinearQuad."))
     push!(a.cells, to_add)
     cell_idx = length(a.cells)
-    coordinates = coords(a)
+    coordinates = coords(to_add)
     num_coords = length(coordinates)
     append!(a.points, coordinates)
     point_idxs = collect(length(a.points) - num_coords + 1: length(a.points))
@@ -71,9 +83,9 @@ function add_celldata!(a::UnstructuredMesh, to_add_idx::Int,
         data_name::String, value::Union{T, Vector3D}) where T <: Real
     
     # NB: MULTIPLE EXIT POINTS FROM FUNCTION
-    @assert(0 < to_add_idx < length(a.cells), string("Index argument",
+    @assert(0 < to_add_idx <= length(a.cells), string("Index argument",
         " had value greater than the length of the cell vector. ",
-        "0 < idx < length(cell vector). Argument was ", to_add_idx,
+        "0 < idx <= length(cell vector). Argument was ", to_add_idx,
         " and length(::UnstructuredMesh.cells) was ", length(a.cells), "."))
 
     if haskey(a.celldata, data_name)
@@ -106,9 +118,9 @@ end
 function add_pointdata!(a::UnstructuredMesh, point_idx::Int, 
     data_name::String, value::Union{Real, Vector3D})
 
-    @assert(0 < point_idx < length(a.points), string("Index argument",
+    @assert(0 < point_idx <= length(a.points), string("Index argument",
         " had value greater than the length of the points vector. ",
-        "0 < idx < length(point vector). Argument was ", point_idx,
+        "0 < idx <= length(point vector). Argument was ", point_idx,
         " and length(::UnstructuredMesh.cells) was ", length(a.points), "."))
 
     if haskey(a.pointdata, data_name)
@@ -147,7 +159,8 @@ function to_vtk_file(a::UnstructuredMesh, path::String)
         pt_idxs = Vector{Int64}()
         coordinates = coords(a.cells[i])
         for j = 1: length(coordinates)
-            push!(pt_idxs, findfirst(x->x === coordinates[j], points))
+            c = findfirst(x->x === coordinates[j], a.points)
+            push!(pt_idxs, c)
         end
         cells[i] = WriteVTK.MeshCell(vtk_cell_type(a.cells[i]), pt_idxs)
     end
@@ -156,6 +169,11 @@ function to_vtk_file(a::UnstructuredMesh, path::String)
     for dataset in a.celldata
         dataname = dataset[1]
         data = dataset[2]
+        if length(data) < length(a.cells)
+            append!(data, fill(typeof(data[1]) == Vector3D ? 
+                Vector3D(NaN, NaN, NaN) : Float64(NaN),
+                length(a.cells) - length(data)))
+        end
         if typeof(data) == Vector{Vector3D}
             data = convert(Matrix{Float64}, data)
         end
@@ -164,16 +182,21 @@ function to_vtk_file(a::UnstructuredMesh, path::String)
     for dataset in a.pointdata
         dataname = dataset[1]
         data = dataset[2]
+        if length(data) < length(a.points)
+            append!(data, fill(typeof(data[1]) == Vector3D ? 
+                Vector3D(NaN, NaN, NaN) : Float64(NaN),
+                length(a.cells) - length(data)))
+        end
         if typeof(data) == Vector{Vector3D}
             data = convert(Matrix{Float64}, data)
         end
         vtkfile = WriteVTK.vtk_cell_data(vtkfile, data, dataname)
     end
-    outfile = WriteVTK.vtk_save(vtk_file)
+    outfile = WriteVTK.vtk_save(vtkfile)
     return outfile
 end
 
-function acceptable_cell_type(Type{UnstructuredMesh}, a::DiscreteGeometry3D)
+function acceptable_cell_type(::Type{UnstructuredMesh}, a::DiscreteGeometry3D)
     typ = typeof(a)
     if typ == Point3D
         return true
@@ -202,4 +225,24 @@ function vtk_cell_type(a::PolyLine2)
 end
 function vtk_cell_type(a::BilinearQuad)
     return WriteVTK.VTKCellTypes.VTK_QUAD
+end
+
+function grow_field_vectors!(a::UnstructuredMesh)
+    lenc = length(a.cells)
+    lenp = length(a.points)
+
+    for field in a.pointdata
+        deficit = lenp - length(field[2])
+        if deficit > 0
+            append!(field[2], fill(typeof(field[2][1]) == Vector3D ? 
+                Vector3D(NaN, NaN, NaN) : NaN, deficit))
+        end
+    end
+    for field in a.celldata
+        deficit = lenp - length(field[2])
+        if deficit > 0
+            append!(field[2], fill(typeof(field[2][1]) == Vector3D ? 
+                Vector3D(NaN, NaN, NaN) : NaN, deficit))
+        end
+    end
 end

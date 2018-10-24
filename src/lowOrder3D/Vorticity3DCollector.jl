@@ -307,3 +307,13 @@ end
 function Base.unsafe_getindex(a::Vorticity3DCollector, i::Integer)
     return Base.unsafe_getindex(a.children, i)
 end
+
+function Base.push!(a::UnstructuredMesh, b::Vorticity3DCollector, 
+    controldict=Dict{String, Any}();
+    celldatadict=Dict{Any, Any}(),
+    pointdatadict=Dict{Any, Any}())
+    for child in b.children
+        push!(a, child, controldict)
+    end
+    return
+end
