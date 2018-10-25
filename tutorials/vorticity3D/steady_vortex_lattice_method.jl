@@ -44,7 +44,7 @@ surf_fn_aoa = x->UNSflow.rotate_about_y(surf_fn(x), aoa)
 # The generate the surface and discretise the surface:
 wing_surf = UNSflow.EquationSurf(surf_fn_aoa)
 spanwise_disc = map(x->cbrt(x), -1:0.1:1)
-chordwise_disc = map(x->x, -1 : 0.125 : 1)
+chordwise_disc = map(x->x, -1 : 0.125: 1)
 wing_geom = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf, 
                                                 chordwise_disc, spanwise_disc)
 
@@ -87,25 +87,12 @@ pressure_wake = zeros(length(problem.variable_aero[2].vorticity))
 
 mesh = UNSflow.UnstructuredMesh()
 extra_data = UNSflow.MeshDataLinker()
-UNSflow.add_celldata!(extra_data, problem.variable_aero[1], "Pressure", pressure_wing)
-UNSflow.add_celldata!(extra_data, problem.variable_aero[2], "Pressure", pressure_wake)
+UNSflow.add_celldata!(extra_data, problem.variable_aero[1], 
+    "Pressure", pressure_wing)
+UNSflow.add_celldata!(extra_data, problem.variable_aero[2], 
+    "Pressure", pressure_wake)
 push!(mesh, problem.variable_aero)
 UNSflow.add_data!(mesh, extra_data)
 UNSflow.to_vtk_file(mesh, "output/steady_vortex_lattice")
 
-                #=
-# And plot the shape of stuff:
-points, cells = UNSflow.to_VtkMesh(
-    convert(Vector{UNSflow.BilinearQuad}, problem.bc_geometry[1]))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[2].geometry))
-vtkfile = WriteVTK.vtk_grid("output/steady_vortex_lattice", points, cells)
-vorticity = vcat(
-    vec(problem.variable_aero[1].vorticity), 
-    vec(problem.variable_aero[2].vorticity))
-WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
-WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure")
-outfiles = WriteVTK.vtk_save(vtkfile)
-=#
 end #let

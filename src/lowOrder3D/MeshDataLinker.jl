@@ -83,6 +83,12 @@ function add_data!(a::UnstructuredMesh, b::MeshDataLinker)
     end
     for field in b.pointdata
         for pnt in field[2]
+            if !haskey(a.pointdata, field[1])
+                a.pointdata[field[1]] = Vector{typeof(pnt[2])}([
+                    typeof(pmt[2]) == Vector3D ? 
+                        Vector3D(NaN, NaN, NaN) : NaN])
+                grow_field_vectors!(a)
+            end
             if haskey(point_idxs, pnt[1])
                 a.pointdata[field[1]][point_idxs[pnt[1]]] = pnt[2]
             end
@@ -95,7 +101,12 @@ function add_data!(a::UnstructuredMesh, b::MeshDataLinker)
     end
     for field in b.celldata
         for cell in field[2]
-            println(geometry_idxs[cell[1]])
+            if !haskey(a.celldata, field[1])
+                a.celldata[field[1]] = Vector{typeof(cell[2])}([
+                    typeof(cell[2]) == Vector3D ? 
+                        Vector3D(NaN, NaN, NaN) : NaN])
+                grow_field_vectors!(a)
+            end
             if haskey(geometry_idxs, cell[1])
                 a.celldata[field[1]][geometry_idxs[cell[1]]] = cell[2]
             end

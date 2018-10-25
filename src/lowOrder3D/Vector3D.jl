@@ -222,6 +222,18 @@ function Base.:(==)(a::Vector3D, b::Vector3D)
     end
 end
 
+function Base.isequal(a::Vector3D, b::Vector3D)
+    if isequal(a.x, b.x) && isequal(a.y, b.y) && isequal(a.z, b.z)
+        return true
+    else
+        return false
+    end
+end
+
+function Base.hash(a::Vector3D, h::UInt)
+    return hash(a.x, h) + hash(a.y, UInt64(31)) + hash(a.z, UInt64(127))
+end
+
 function Base.iszero(a::Vector3D)
     if a.x == 0.0 && a.y == 0.0 && a.z == 0.0
         return true

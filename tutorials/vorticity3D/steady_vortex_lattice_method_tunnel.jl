@@ -108,42 +108,11 @@ println("Force coeffs ", 2 * force /
 println("Moments are ", moment)
 
 # STEP 5: Output to VTK file ---------------------------------------------------
-pressure = vcat(vec(pressure), 
-                zeros(length(problem.variable_aero[2].vorticity)),
-                zeros(length(problem.variable_aero[3].vorticity)),
-                zeros(length(problem.variable_aero[4].vorticity)),
-                zeros(length(problem.variable_aero[5].vorticity)),
-                zeros(length(problem.variable_aero[6].vorticity)))
-
-# And plot the shape of stuff:
-points, cells = UNSflow.to_VtkMesh(
-    convert(Vector{UNSflow.BilinearQuad}, problem.bc_geometry[1]))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[2].geometry))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[3].geometry))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[4].geometry))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[5].geometry))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[6].geometry))
-vtkfile = WriteVTK.vtk_grid("output/steady_vortex_lattice_tunnel", 
-    points, cells)
-vorticity = vcat(
-    vec(problem.variable_aero[1].vorticity), 
-    vec(problem.variable_aero[2].vorticity),
-    vec(problem.variable_aero[3].vorticity), 
-    vec(problem.variable_aero[4].vorticity), 
-    vec(problem.variable_aero[5].vorticity), 
-    vec(problem.variable_aero[6].vorticity))
-WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
-WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure difference")
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh()
+extra_data = UNSflow.MeshDataLinker()
+UNSflow.add_celldata!(extra_data, problem.variable_aero[1],"Pressure", pressure)
+push!(mesh, problem.variable_aero)
+UNSflow.add_data!(mesh, extra_data)
+UNSflow.to_vtk_file(mesh, "output/steady_vortex_lattice_tunnel")
 
 end #let

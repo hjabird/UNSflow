@@ -519,7 +519,6 @@ function add_celldata!(a::MeshDataLinker, b::VortexRingLattice,
         string("length(data) must equal the length(geometry) of the vortex",
             " lattice. length(data) = ",length(data)," and length(geometry) = ",
             length(b.geometry), "."))
-    
     geom1 = convert(Vector{BilinearQuad}, b.geometry)
     geom2 = vec(map(x->x.geometry, convert(Vector{VortexRing}, b)))
     for i = 1 : length(geom1)
