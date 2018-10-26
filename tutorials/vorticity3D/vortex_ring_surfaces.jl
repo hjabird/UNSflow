@@ -26,7 +26,6 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-import WriteVTK
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 
@@ -80,19 +79,14 @@ println("Plate area was ", UNSflow.area(disc_surf))
 println("Moments were ", moment)
 
 # And outputting the data to VTK -----------------------------------------------
-points, cells = UNSflow.to_VtkMesh(
-    convert(Vector{UNSflow.BilinearQuad}, disc_surf))
-points, cells = UNSflow.add_to_VtkMesh(points, cells, ext_ring.geometry)
-# Get the celldata into the required format.
-vorticity = vec(ring_lattice.strengths)
-push!(vorticity, 1.0) #For our vortex ring.
-pressure = vec(pressure)
-push!(pressure, 0.0) #For our vortex ring
-
-vtkfile = WriteVTK.vtk_grid("output/lattice_in_ring", points, cells)
-WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
-WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure")
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh()
+push!(mesh, ring_lattice)
+push!(mesh, ext_ring, Dict("VortexRingAsFilaments"=>true))
+extra_data = UNSflow.MeshDataLinker()
+map(x->UNSflow.add_celldata!(extra_data, "PressureDiff", x[1], x[2]),
+    zip(convert(Matrix{UNSflow.BilinearQuad}, ring_lattice.geometry), pressure))
+UNSflow.add_data!(mesh, extra_data)
+UNSflow.to_vtk_file(mesh, "output/lattice_in_ring")
 
 end # Let
 # That's all folks -------------------------------------------------------------

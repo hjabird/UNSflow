@@ -11,24 +11,23 @@ h.bird.1@research.gla.ac.uk
 push!(LOAD_PATH, "../../src/")
 import UNSflow
 include("VortexFlowFeatures.jl")
-import WriteVTK  # We'll use this package to output to VTK for visualisation.
 
 let # The change in scope rules in Julia_1.0 make for a pickle otherwise.
 #-------------------------- User (that's you) parameters ---------------------=#
 # ODE integration parameters
-num_steps = 50
+num_steps = 100
 dt = 0.01
 # Data saving parameters
 basepath = "./output/leapfrogging_rings_"   # Where to write our output files
 save_every = 10                       # Save every 10 steps.
 # Initial conditions
 ring_strength = [1., 1.]
-ring_particles = [120, 120]
+ring_particles = [50, 50]
 ring_radii = [1., 1.]
 ring_locations = [0., 1.]
 
 #=---------------------- Automated problem setup -----------------------------=#
-num_rings = size(ring_particles)[1]
+num_rings = length(ring_particles)
 particles = UNSflow.Vorticity3DSimpleCollector()
 for i = 1 : num_rings
     c = UNSflow.Vector3D(ring_locations[i], 0., 0.)
@@ -43,24 +42,15 @@ for i = 1 : num_rings
         UNSflow.get_children(particles),
         UNSflow.get_children(ring))
 end
-num_particles = size(particles)[1]
+num_particles = length(particles)
 
 #=-------------------------- ODE time integration ----------------------------=#
 @time for i = 1 : num_steps
-    # Save the current state to vtk if required
+    # Save only on some steps.
     if (i - 1) % save_every == 0
-        points = zeros(3, 0)
-        point_vorticity = zeros(3, num_particles)
-        cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
-        for j = 1 : num_particles
-            points, cells = UNSflow.add_to_VtkMesh(
-                points, cells, particles[j].geometry)
-            point_vorticity[:, j] = [particles[j].vorticity.x,
-                particles[j].vorticity.y, particles[j].vorticity.z]
-        end
-        vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
-        WriteVTK.vtk_cell_data(vtkfile, point_vorticity, "vorticity")
-        outfiles = WriteVTK.vtk_save(vtkfile)
+        mesh = UNSflow.UnstructuredMesh()
+        push!(mesh, particles)
+        UNSflow.to_vtk_file(mesh, string("output/leapfrogging_rings_", i))
     end
 
     # Calculate the next iteration

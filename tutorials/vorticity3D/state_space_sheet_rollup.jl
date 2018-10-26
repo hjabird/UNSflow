@@ -13,7 +13,6 @@ h.bird.1@research.gla.ac.uk
 # Plotting in Julia on my PC is broken, so I have to load dependencies like
 # this. If yours works, try import UNSflow instead.
 
-import WriteVTK  # We'll use this package to output to VTK for visualisation.
 import DifferentialEquations
 push!(LOAD_PATH,"../../src/")
 import UNSflow
@@ -68,20 +67,10 @@ end
 f(u, p, t) = dstate(u)
 while time < max_time
     UNSflow.update_using_state_vector!(particles, state)
-    points = zeros(3, 0)
-    point_vorticity = zeros(3, num_particles)
-    cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
-    for j = 1 : num_particles
-        points, cells = UNSflow.add_to_VtkMesh(points,
-            cells, particles[j].geometry)
-        point_vorticity[:, j] = [particles[j].vorticity.x,
-            particles[j].vorticity.y, particles[j].vorticity.z]
-    end
-    vtkfile = WriteVTK.vtk_grid(string(basepath, Int32(time/save_every)),
-        points, cells)
-    WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
-    outfiles = WriteVTK.vtk_save(vtkfile)
-
+    mesh = UNSflow.UnstructuredMesh()
+    push!(mesh, particles)
+    UNSflow.to_vtk_file(mesh, string("output/state_space_sheet_rollup_", 
+        Int64(round(time / save_every))))
 
     # Calculate the next iteration
     prob = DifferentialEquations.ODEProblem(f, state, (time, time+save_every))
