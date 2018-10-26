@@ -13,7 +13,6 @@ h.bird.1@research.gla.ac.uk
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 include("VortexFlowFeatures.jl")
-import WriteVTK  # We'll use this package to output to VTK for visualisation.
 
 function main()
 #---------------------------- User parameters --------------------------------=#
@@ -62,19 +61,9 @@ end
 #=-------------------------- ODE time integration ----------------------------=#
 for i = 1 : num_steps
     println("Vorticity: ", UNSflow.vorticity(particles))
-    # Save the current state to vtk if required
-    num_particles = length(particles)
-    if (i - 1) % save_every == 0
-        point_vorticity = zeros(3, num_particles)
-        points, cells = UNSflow.to_VtkMesh(map(x->x.geometry, particles))
-        for j = 1 : num_particles
-            point_vorticity[:, j] = [particles[j].vorticity.x,
-                particles[j].vorticity.y, particles[j].vorticity.z]
-        end
-        vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
-        WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
-        outfiles = WriteVTK.vtk_save(vtkfile)
-    end
+    mesh = UNSflow.UnstructuredMesh()
+    push!(mesh, particles)
+    UNSflow.to_vtk_file(mesh, string("output/resdistributing_rollup_", i))
 
     # Calculate the next iteration
     @time UNSflow.euler!(particles, particles, dt)
