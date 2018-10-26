@@ -50,6 +50,22 @@ function UnstructuredMesh()
         Vector{DiscreteGeometry3D}())
 end
 
+function UnstructuredMesh(cells::Any)
+    ret = UnstructuredMesh()
+    if typeof(cells) <: DiscreteGeometry3D
+        add_cell!(ret, cells)
+    elseif hasmethod(iterate, Tuple{typeof(cells)})
+        for cell in cells
+            add_cell!(ret, cell)
+        end
+    else
+        error("Could not initialise Unstructured mesh with cells of type ", 
+            typeof(cells), ". This should be a supertype of DiscreteGeometry3D",
+            " or an iterable object.")
+    end
+    return ret
+end
+
 function Base.push!(a::UnstructuredMesh, 
     b::Any, 
     controldict=Dict{String, Any}())
@@ -79,6 +95,26 @@ function add_cell!(a::UnstructuredMesh, to_add::DiscreteGeometry3D)
     return (cell_idx, point_idxs)
 end
 
+function add_cells!(a::UnstructuredMesh, to_add::Any)
+    ret = Vector{Tuple{Int64, Vector{Int64}}}()
+    # Catch errors which'd probably just annoy the user if I pointed it out...
+    if typeof(to_add) <: DiscreteGeometry3D
+        push!(ret, add_cell!(a, to_add))
+    else    
+        @assert(hasmethod(iterate, Tuple{typeof(to_add)}),
+            string("add_cell! takes arguement of ",
+            "an iterable (ie. has method iterate) of DiscreteGeometry3D. ",
+            "Called with add_cell!(::UnstructuredMesh, ::", typeof(to_add),
+            ")."))
+        @assert(hasmethod(length, Tuple{typeof(to_add)}), "The iterable argument ",
+            "to_add must have a method length(::typeof(to_add)).")
+        if length(to_add) > 0
+            ret = map(x->add_cell!(a, x), to_add)
+        end
+    end
+    return ret
+end
+
 function add_celldata!(a::UnstructuredMesh, to_add_idx::Int, 
         data_name::String, value::Union{T, Vector3D}) where T <: Real
     
@@ -105,6 +141,9 @@ function add_celldata!(a::UnstructuredMesh, to_add_idx::Int,
         end
     end
     # Data of data_name doesn't exist or is zero length.
+    if !haskey(a.celldata, data_name) 
+        assert_on_name_conflict(a, data_name)
+    end
     if typeof(value) <: Real
         a.celldata[data_name] = fill(NaN, length(a.cells))
     else
@@ -130,7 +169,7 @@ function add_pointdata!(a::UnstructuredMesh, point_idx::Int,
                 " to celldata with name ", data_name, " which contains data",
                 " of type ", typeof(a.pointdata[dataname][1])))
             if point_idx > length(a.pointdata[data_name])
-                length_deficit = length(a.cells) - length(a.pointdata[data_name])
+                length_deficit = length(a.points)-length(a.pointdata[data_name])
                 append!(a.pointdata[data_name], 
                     fill(typeof(value) == Vector3D ? 
                         Vector3D(NaN, NaN, NaN) : NaN, length_deficit))
@@ -139,7 +178,10 @@ function add_pointdata!(a::UnstructuredMesh, point_idx::Int,
             return # EXIT 1
         end
     end
-    # Data of data_name doesn't exist or is zero length.
+    # Data of data_name doesn't exist or is zero length.    
+    if !haskey(a.pointdata, data_name) 
+        assert_on_name_conflict(a, data_name)
+    end
     if typeof(value) <: Real
         a.pointdata[data_name] = fill(NaN, length(a.cells))
     else
@@ -244,5 +286,24 @@ function grow_field_vectors!(a::UnstructuredMesh)
             append!(field[2], fill(typeof(field[2][1]) == Vector3D ? 
                 Vector3D(NaN, NaN, NaN) : NaN, deficit))
         end
+    end
+end
+
+function assert_on_name_conflict(a::UnstructuredMesh, new_name::String)
+    nc = check_name_conflict(a, new_name)
+    @assert( nc == false ,
+        string("Name ", new_name, " was already in use in either pointdata or ",
+            "celldata. You cannot use the same name in both - it'll crash ",
+            "Paraview (home of the most fragile file readers around)."))
+    return
+end
+
+function check_name_conflict(a::UnstructuredMesh, new_name::String)
+    if new_name in keys(a.pointdata)
+        return true
+    elseif new_name in keys(a.celldata)
+        return true
+    else
+        return false
     end
 end

@@ -164,12 +164,12 @@ function induced_velocity_curl(
 end
 
 function state_vector_length(a::Vorticity3DCollector)
-    return mapreduce(state_vector_length, +, this.children, init=0)
+    return mapreduce(state_vector_length, +, a.children, init=0)
 end
 
 function state_vector(a::Vorticity3DCollector)
     sv = Vector{Float64}()
-    for child in this.children
+    for child in a.children
         append!(sv, state_vector(child))
     end
     return sv
@@ -180,16 +180,16 @@ function update_using_state_vector!(
     state_vect::Vector{Float64})
 
     lens = map(state_vector_length, this.children)
-    @assert(mapreduce(x, +, lens, init=0) == length(state_vect), string(
+    @assert(sum(lens) == length(state_vect), string(
         "Input state vector was the incorrect length. Length was ",
         length(state_vect), " but should have been ",
         mapreduce(x, +, lens, init=0), "."))
 
     offset = 1
     for i = 1 : length(this.children)        
-        update_using_state_vector(
+        update_using_state_vector!(
             this.children[i],
-            vort_vect[offset : offset + lens[i] - 1])
+            state_vect[offset : offset + lens[i] - 1])
         offset += lens[i]
     end
     return
@@ -274,33 +274,19 @@ function Base.size(a::Vorticity3DCollector)
     return size(a.children)
 end
 
-if VERSION >= VersionNumber(0, 7, 0)    # Why not use Julia you ask?
-    function Base.firstindex(a::Vorticity3DCollector)
-        return 1
-    end
+function Base.firstindex(a::Vorticity3DCollector)
+    return 1
+end
 
-    function Base.lastindex(a::Vorticity3DCollector)
-        return length(a.children)
-    end
+function Base.lastindex(a::Vorticity3DCollector)
+    return length(a.children)
+end
 
-    function Base.iterate(a::Vorticity3DCollector, state=1)
-        if state > length(a)
-            return nothing
-        else
-            return (a.children[state], state + 1)
-        end
-    end
-else # Version 0.6 or older.
-    function Base.start(a::Vorticity3DCollector)
-        return 1
-    end
-
-    function Base.next(a::Vorticity3DCollector, state::Integer)
-        return (a[state], state+1)
-    end
-
-    function Base.done(a::Vorticity3DCollector, state::Integer)
-        return state > length(a)
+function Base.iterate(a::Vorticity3DCollector, state=1)
+    if state > length(a)
+        return nothing
+    else
+        return (a.children[state], state + 1)
     end
 end
 
@@ -309,9 +295,8 @@ function Base.unsafe_getindex(a::Vorticity3DCollector, i::Integer)
 end
 
 function Base.push!(a::UnstructuredMesh, b::Vorticity3DCollector, 
-    controldict=Dict{String, Any}();
-    celldatadict=Dict{Any, Any}(),
-    pointdatadict=Dict{Any, Any}())
+    controldict=Dict{String, Any}())
+
     for child in b.children
         push!(a, child, controldict)
     end
