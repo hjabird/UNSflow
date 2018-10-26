@@ -246,6 +246,40 @@ function steady_forces(a::VortexRingLattice,
     return forces
 end
 
+function unsteady_forces(
+    a::VortexRingLattice, 
+    old_vort_vect::Vector{T},
+    dt::Real) where T <: Real
+
+    # Unsteady Bernoulli:
+    # (P / rho) = Q^2/2 - vref^2/2 + dpotential/dt
+    # (P / rho) = steady_result + dpotential/dt
+    # So we want the difference in potential over the top/bottom of the ring.
+    # This is approximately the rate of change of ring vorticity
+    # See Katz 13.149
+    @assert(vorticity_vector_length(a) == length(old_vort_vect),
+        string("Expected old and current vorticity vector lengths to match.",
+        " Old vector length is ", length(old_vort_vect), " and current ",
+        "vector length is ", vorticity_vector_length(a)))
+    @assert(dt != 0, string("dt cannot be equal to zero. Given value was ",
+                            dt))
+    if any(isnan.(old_vort_vect)) || any(isinf.(old_vort_vect))
+        @warn "Inf or NaN values in old vorticity vector"
+    end
+    current_vort_vector = vorticity_vector(a)
+    if any(isnan.(current_vort_vector)) || any(isinf.(current_vort_vector))
+        @warn "Inf or NaN values in current vorticity vector"
+    end
+    dvort = (vorticity_vector(a) - old_vort_vect) / dt
+    m_unsteady_pressures = dvort
+    m_areas = vec(areas(a.geometry))
+    m_normals = vec(normals(a.geometry))
+    m_forces = map(x->x[1]*unit(x[2])*x[3], 
+        zip(m_unsteady_pressures, m_unsteady_normals, m_areas))
+    m_forces = reshape(m_forces, size(a.vorticity))
+    return m_forces
+end
+
 function steady_pressures(a::VortexRingLattice,
     vel_fn::Function, 
     density::Real=1;
@@ -270,6 +304,17 @@ function steady_pressures(a::VortexRingLattice,
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, force))
     press = normal_forces ./ mareas
     return press
+end
+
+function unsteady_pressures(a::VortexRingLattice,
+    old_vort_vect::Vector{T}, dt::Real) where T <: Real
+
+    forces = unsteady_forces(a, old_vort_vect, dt)
+    m_areas = areas(a.geometry)
+    m_normals = normals(a.geometry)
+    m_press = map(x->dot(x[1], unit(x[2]))/x[3], 
+        zip(forces, m_normals, m_areas))
+    return m_press
 end
 
 function steady_loads(a::VortexRingLattice,
@@ -304,6 +349,22 @@ function steady_loads(a::VortexRingLattice,
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, mforces))
     all_pressures = normal_forces ./ mareas
     return total_forces, total_moment, all_pressures
+end
+
+function unsteady_loads(a::VortexRingLattice,
+    old_vort_vect::Vector{T}, dt::Real;
+    measurement_centre::Vector3D=Vector3D(0,0,0)) where T <: Real
+
+    mpress = unsteady_pressures(a, old_vort_vect, dt)
+    mforces = unsteady_forces(a, old_vort_vect, dt)
+    mareas = areas(a.geometry)
+    mcents = centres(a.geometry)
+    total_forces = sum(mforces)
+    moment_contrib = map(
+        x->cross(x[1]-measurement_centre, x[2]),
+        zip(mcents, mforces))
+    total_moment = sum(moment_contrib)
+    return total_forces, total_moment, mpress
 end
 
 function state_vector_length(a::VortexRingLattice)
