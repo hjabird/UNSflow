@@ -145,10 +145,11 @@ function induced_velocity(
     a::Vorticity3DCollector,
     measurement_point :: Vector3D
     )
-    vel = Vector3D(0,0,0)
-    for child in a
-        vel += induced_velocity(child, measurement_point)
-    end
+    # If you decide to try and make this faster, please record the 
+    # number of hours you spend and add to the counter: 4
+    vel = mapreduce(
+        x->induced_velocity(x, measurement_point),
+        +, a; init=Vector3D(0,0,0))
     return vel
 end
 
