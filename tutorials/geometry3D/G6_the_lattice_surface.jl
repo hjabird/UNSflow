@@ -30,7 +30,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 let
 # We'll steal the code to make a sphere from G2 for this.
@@ -55,9 +54,8 @@ l2vect = convert(Vector{UNSflow.Line2}, discrete_surf)
 # this beyond diversifying file formats.
 
 # We'll export the Line2 version because it best represents the lattice:
-points, cells = UNSflow.to_VtkMesh(l2vect)
-vtkfile = WriteVTK.vtk_grid("output/G6_line2_sphere", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh(l2vect)
+UNSflow.to_vtk_file(mesh, "output/G6_line2_sphere")
 
 # We can also do the same to make a tube. Why? Because I need to test that
 # the ends appear in the conversion to line2s.
@@ -67,9 +65,7 @@ y_def = x->cos(pi * x[1])
 surf = UNSflow.EquationSurf(x_def, y_def, z_def)
 discrete_surf = UNSflow.discretise(surf, UNSflow.LatticeQuadSurf,
     collect(-1:0.1:1), collect(-1:0.2:1))
-l2vect = convert(Vector{UNSflow.Line2}, discrete_surf)
-points, cells = UNSflow.to_VtkMesh(l2vect)
-vtkfile = WriteVTK.vtk_grid("output/G6_line2_tube", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh(convert(Vector{UNSflow.Line2}, discrete_surf))
+UNSflow.to_vtk_file(mesh, "output/G6_line2_tube")
 
 end #let

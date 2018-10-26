@@ -28,7 +28,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 let
 #= Code to make a tube stolen from G1_making_a_tube.jl ========================#
@@ -38,7 +37,7 @@ y_def = x->cos(pi * x[1])
 surf = UNSflow.EquationSurf(x_def, y_def, z_def)
 discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:0.1:1), collect(-1:0.2:1))
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
+mesh = UNSflow.UnstructuredMesh(discrete_surf)
 #= Finish making a tube =======================================================#
 
 # Lets make a path on the surface. We can define some local x coordinates
@@ -46,17 +45,15 @@ points, cells = UNSflow.to_VtkMesh(discrete_surf)
 xs = collect(-0.5: 0.02 : 0.7)
 ys = 0.8 * sin.(xs * pi * 4) .+ 0.1
 path = UNSflow.discretise(surf, UNSflow.PolyLine2, [xs ys])
-points, cells = UNSflow.add_to_VtkMesh(points, cells, path)
+UNSflow.add_cells!(mesh, path)
 
 # We can also distribute points evenly using the Spline3D class.
 xs = collect(-0.5: 0.02 : 0.7)
 ys = -0.7 * sin.(xs * pi * 3 .+ 0.5)
 spline = UNSflow.discretise(surf, UNSflow.Spline3D, [xs ys])
 vects = UNSflow.distribute(spline, 0, spline.limits[2], 300)
-points, cells = UNSflow.add_to_VtkMesh(points, cells, map(UNSflow.Point3D, vects))
+UNSflow.add_cells!(mesh, map(UNSflow.Point3D, vects))
 
 # Now turn it into a vtk file...
-vtkfile = WriteVTK.vtk_grid("output/G3_surface_path", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
-
+UNSflow.to_vtk_file(mesh, "output/G3_surface_path")
 end #let
