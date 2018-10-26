@@ -63,7 +63,7 @@ for i = 1 : num_steps
     println("Vorticity: ", UNSflow.vorticity(particles))
     mesh = UNSflow.UnstructuredMesh()
     push!(mesh, particles)
-    UNSflow.to_vtk_file(mesh, string("output/resdistributing_rollup_", i))
+    UNSflow.to_vtk_file(mesh, string(basepath, i))
 
     # Calculate the next iteration
     @time UNSflow.euler!(particles, particles, dt)
