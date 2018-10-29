@@ -65,15 +65,15 @@ end
 
 # STEP 4: Post-process ---------------------------------------------------------
 # We need the induced velocity to caluclate the forces on the lattice:
-ind_vel_fn = x -> free_stream + 
-    UNSflow.induced_velocity(problem.variable_aero, x)
+ind_vel_fn = x -> UNSflow.induced_velocity(
+        UNSflow.vorticities(problem.problem), x)
 # We can calculate some useful stuff using steady_loads:
 force, moment, pressure_wing = UNSflow.steady_loads(
-    problem.variable_aero[1], 
+    problem.problem.variable_vorticities[1], 
     ind_vel_fn; 
     # The wing vortex lattice is overlapped by that of the wake, so we need to 
     # correct for that - imax indicates the maximum i index of the lattice.
-    imax_filament_strs=-problem.variable_aero[2].vorticity[1,:])
+    imax_filament_strs=-problem.problem.variable_vorticities[2].vorticity[1,:])
 
 # Print out some useful things:
 println("Wing area is ", UNSflow.area(wing_geom))
@@ -83,15 +83,15 @@ println("Force coeffs ", 2 * force /
 println("Moments are ", moment)
 
 # STEP 5: Output to VTK file ---------------------------------------------------
-pressure_wake = zeros(length(problem.variable_aero[2].vorticity))
+pressure_wake = zeros(length(problem.problem.variable_vorticities[2].vorticity))
 
 mesh = UNSflow.UnstructuredMesh()
 extra_data = UNSflow.MeshDataLinker()
-UNSflow.add_celldata!(extra_data, problem.variable_aero[1], 
+UNSflow.add_celldata!(extra_data, problem.problem.variable_vorticities[1], 
     "Pressure", pressure_wing)
-UNSflow.add_celldata!(extra_data, problem.variable_aero[2], 
+UNSflow.add_celldata!(extra_data, problem.problem.variable_vorticities[2], 
     "Pressure", pressure_wake)
-push!(mesh, problem.variable_aero)
+push!(mesh, problem.problem.variable_vorticities)
 UNSflow.add_data!(mesh, extra_data)
 UNSflow.to_vtk_file(mesh, "output/steady_vortex_lattice")
 

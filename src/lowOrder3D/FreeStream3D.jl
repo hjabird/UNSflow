@@ -31,52 +31,52 @@ mutable struct FreeStream3D <: Vorticity3D
     velocity :: Vector3D
 end
 
-function vorticity(a::FreeStream)
+function vorticity(a::FreeStream3D)
     return Vector3D(0,0,0)
 end
 
-function induced_velocity(a::FreeStream)
-    return velocity
+function induced_velocity(a::FreeStream3D, mes_pnt::Vector3D)
+    return a.velocity
 end
 
-function induced_velocity_curl(a::FreeStream)
+function induced_velocity_curl(a::FreeStream3D, mes_pnt::Vector3D)
     return zeros(3,3)
 end
 
-function euler!(a::FreeStream, influence_field::Vorticity3D, dt::Real)
+function euler!(a::FreeStream3D, influence_field::Vorticity3D, dt::Real)
     return
 end
 
-function state_vector_length(a::FreeStream)
+function state_vector_length(a::FreeStream3D)
     return 0
 end
 
 function update_using_state_vector!(
-    this::FreeStream,
+    this::FreeStream3D,
     state_vect::Vector{T}) where T <: Real
     @assert(length(state_vect) == 0, "FreeStream has no state!")
     return
 end
 
 function state_time_derivative(
-    a::FreeStream,
+    a::FreeStream3D,
     inducing_bodies::Vorticity3D)
     return Vector{Float64}()
 end
 
-function vorticity_vector_length(a::FreeStream)
+function vorticity_vector_length(a::FreeStream3D)
     # In some senses this is cheating, but this is needed in the
     # sense that one ought to be able to compute velocity from a
     # strength / influence multiplication.
     return 3
 end
 
-function vorticity_vector(a::FreeStream)
+function vorticity_vector(a::FreeStream3D)
     return Vector{Float64}(a.velocity)
 end
 
 function update_using_vorticity_vector!(
-    this::FreeStream,
+    this::FreeStream3D,
     vort_vect::Vector{T}) where T <: Real
     @assert(length(vort_vect) == 3)
     a.velocity == convert(Vector3D, vort_vect)
@@ -84,7 +84,7 @@ function update_using_vorticity_vector!(
 end
 
 function vorticity_vector_velocity_influence(
-    this::Vorticity3D,
+    this::FreeStream3D,
     mes_pnt::Vector3D
     )
     ret = LinearAlgebra.Identity * a.velocity
