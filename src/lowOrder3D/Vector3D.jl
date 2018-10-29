@@ -293,6 +293,14 @@ function Base.isfinite(a::Vector3D)
     return isfinite(a.x) && isfinite(a.y) && isfinite(a.z)
 end
 
+function Base.isnan(a::Vector3D)
+    return isnan(a.x) || isnan(a.y) || isnan(a.z)
+end
+
+function Base.isinf(a::Vector3D)
+    return isinf(a.x) || isinf(a.y) || isinf(a.z)
+end
+
 function rotate_about_x(point::Vector3D, angle :: Float64)
     s = sin(angle)
     c = cos(angle)
