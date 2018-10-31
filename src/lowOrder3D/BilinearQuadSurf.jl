@@ -33,7 +33,7 @@ mutable struct BilinearQuadSurf <: DiscreteGeometry3D
         new(a)
     end
     function BilinearQuadSurf(isize::Int, jsize::Int)
-        c = Matrix{Vector3D}(undef, (isize, jsize))
+        c = Matrix{Vector3D}(undef, (isize+1, jsize+1))
         new(c)     
     end
 end
@@ -79,6 +79,11 @@ end
 function Base.size(a::BilinearQuadSurf)
     i, j = size(a.coordinates)
     return (i-1, j-1)
+end
+
+function Base.size(a::BilinearQuadSurf, dir::Int)
+    s = size(a.coordinates, dir)
+    return s-1
 end
 
 function Base.length(a::BilinearQuadSurf)
