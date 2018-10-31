@@ -90,3 +90,13 @@ function vorticity_vector_velocity_influence(
     ret = LinearAlgebra.Identity * a.velocity
     return ret
 end
+
+function Base.push!(a::UnstructuredMesh, b::FreeStream3D, 
+        controldict=Dict{String, Any}())
+    return
+end
+
+function Base.print(a::FreeStream3D)
+    print(typeof(a), "(", a.velocity[1], ", ", a.velocity[2], ", ",
+        a.velocity[3], ")")
+end
