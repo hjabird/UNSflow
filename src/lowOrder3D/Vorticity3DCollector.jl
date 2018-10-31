@@ -303,3 +303,21 @@ function Base.push!(a::UnstructuredMesh, b::Vorticity3DCollector,
     end
     return
 end
+
+function Base.print(a::Vorticity3DCollector)
+    print(typeof(a), " with ", length(a), " direct children")
+end
+
+function Base.println(a::Vorticity3DCollector)
+    print(typeof(a), " with ", length(a), " direct children")
+    if length(a.children) < 10
+        print(":\n")
+        for child in zip(keys(a.children), values(a.children))
+            print("\t", child[1], "\t")
+            print(child[2])
+            print("\n")
+        end
+    else
+        print("\n")
+    end
+end
