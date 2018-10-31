@@ -55,11 +55,11 @@ mutable struct VortexLatticeMethod
         wake_child = LinkedVorticity3DChild(wake_aero)
 
         problem = NeumannProblem3D()
-        push!(  problem.variable_vorticities,
+        push!(  problem.variable_vorticity,
                 LinkedVorticity3DParent(
                     wing_aero_original, wake_child, transform_mat))
-        push!(      problem.variable_vorticities, wake_child)
-        push!(      problem.invariant_vorticities, FreeStream3D(free_stream))
+        push!(      problem.variable_vorticity, wake_child)
+        push!(      problem.invariant_vorticity, FreeStream3D(free_stream))
         append!(    problem.bc_points,      vec(centres(wing_geometry)))
         append!(    problem.bc_directions,  vec(normals(wing_geometry)))
         append!(    problem.bc_velocities,  zeros(length(problem.bc_points)))
@@ -77,12 +77,12 @@ function relax_wake!(
     a::VortexLatticeMethod; 
     relaxation_factor::T=0.1) where T <: Real
 
-    vort = a.problem.variable_vorticities
+    vort = a.problem.variable_vorticity
     points = vort[2].geometry.coordinates
     for i = 2 : size(points, 1)
         vels = map(
             x-> induced_velocity(vort, x) + 
-                induced_velocity(a.problem.invariant_vorticities, x),
+                induced_velocity(a.problem.invariant_vorticity, x),
             points[i, :])
         # Forward difference:
         comparison_vect = unit.(points[i, :] - points[i-1, :])

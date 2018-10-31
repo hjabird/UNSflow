@@ -31,18 +31,18 @@ mutable struct NeumannProblem3D
     bc_points :: Vector{Vector3D}
     bc_directions :: Vector{Vector3D}
     bc_velocities :: Vector{Float64}
-    variable_vorticities :: Vorticity3D
-    invariant_vorticities :: Vorticity3D
+    variable_vorticity :: Vorticity3D
+    invariant_vorticity :: Vorticity3D
 
     function NeumannProblem3D(
         bc_points :: Vector{Vector3D},
         bc_directions :: Vector{Vector3D},
         bc_velocities :: Vector{Float64},
-        variable_vorticities :: Vorticity3D,
-        invariant_vorticities :: Vorticity3D)
+        variable_vorticity :: Vorticity3D,
+        invariant_vorticity :: Vorticity3D)
 
         new(bc_points, bc_directions, bc_velocities, 
-            variable_vorticities, invariant_vorticities)
+            variable_vorticity, invariant_vorticity)
     end
 end
 
@@ -50,31 +50,31 @@ function NeumannProblem3D()
     bc_points = Vector{Vector3D}()
     bc_directions = Vector{Vector3D}()
     bc_velocities = Vector{Float64}()
-    variable_vorticities = Vorticity3DSimpleCollector()
-    invariant_vorticities = Vorticity3DSimpleCollector()
+    variable_vorticity = Vorticity3DSimpleCollector()
+    invariant_vorticity = Vorticity3DSimpleCollector()
 
     NeumannProblem3D(bc_points, bc_directions, bc_velocities, 
-        variable_vorticities, invariant_vorticities)
+        variable_vorticity, invariant_vorticity)
 end
 
 function vorticities(a::NeumannProblem3D)
     return Vorticity3DSimpleCollector(
-        a.variable_vorticities, a.invariant_vorticities)
+        a.variable_vorticity, a.invariant_vorticity)
 end
 
 function solve!(a::NeumannProblem3D)
     check_valid(a)
-    mtrx = normal_velocity_influence_matrix(a.variable_vorticities, 
+    mtrx = normal_velocity_influence_matrix(a.variable_vorticity, 
         a.bc_points, a.bc_directions)
 
     fs_vector = map(
-        x->dot(induced_velocity(a.invariant_vorticities, x[1]), x[2]), 
+        x->dot(induced_velocity(a.invariant_vorticity, x[1]), x[2]), 
         zip(a.bc_points, unit.(a.bc_directions)))
         
     # mtrx*solution + fs_vector = velocities
     soln = (mtrx) \ (a.bc_velocities - fs_vector)
     
-    update_using_vorticity_vector!(a.variable_vorticities, soln)
+    update_using_vorticity_vector!(a.variable_vorticity, soln)
     return
 end
 
@@ -93,11 +93,11 @@ function check_valid(a::NeumannProblem3D)
             "bc_directions.")
     @assert(all(isfinite.(a.bc_velocities)), "Non-finite values in "*
             "bc_velocities.")
-    @assert(len == vorticity_vector_length(a.variable_vorticities),
+    @assert(len == vorticity_vector_length(a.variable_vorticity),
         string("Length of boundary condition vectors did not match that ",
         "of the the vorticity control vector: bc vector length was ",
         len, " and vorticity control vector length was ", 
-        vorticity_vector_length(a.variable_vorticities)))
+        vorticity_vector_length(a.variable_vorticity)))
     return
 end
 
@@ -134,5 +134,12 @@ function add_bc!(a::NeumannProblem3D,
     append!(a.bc_points, vec(points))
     append!(a.bc_directions, vec(directions))
     append!(a.bc_velocities, vec(velocities))
+    return
+end
+
+function clear_bcs!(a::NeumannProblem3D)
+    empty!(a.bc_points)
+    empty!(a.bc_directions)
+    empty!(a.bc_velocities)
     return
 end
