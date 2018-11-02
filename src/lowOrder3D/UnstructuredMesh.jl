@@ -307,3 +307,47 @@ function check_name_conflict(a::UnstructuredMesh, new_name::String)
         return false
     end
 end
+
+function merge_redundant_points!(a::UnstructuredMesh)
+    grow_field_vectors!(a::UnstructuredMesh)
+    # Some points might be repeated, but if they have different pointdata 
+    # for two points at the same location, we don't want to merge that.
+    # We'll try and keep the one with the first index...
+    # Step 1 find repeated points and record index of first instance.
+    firstidx = Vector{Int64}(undef, length(a.points))
+    encountered = Dict{Vector3D, Int64}()
+    for i = 1 : length(a.points)
+        if haskey(encountered, a.points[i])
+            firstidx[i] = encountered[a.points[i]]
+        else
+            firstidx[i] = i
+            encountered[a.points[i]] = i
+        end
+    end
+    # Step 2 correct where points have different data associated with them.
+    for field in a.pointdata
+        for i = 1 : length(a.points)
+            firstidx[i] = field[2][i] == field[2][firstidx[i]] ? firstidx[i] : i
+        end
+    end
+    # Step 3 adjust firstidx for where the offset is changing...
+    offset = 0
+    for i = 1 : length(a.points)
+        firstidx[i] = firstidx[i] - offset
+        if firstidx[i] != i
+            offset += 1
+        end
+    end
+    # Step 4 adjust cell point indexes & make new point vector
+    new_points = Vector{Int64}()
+    offset = 1
+    for i = 1 : length(a.points)
+        if firstidx[i] >= offset
+            offset += 1
+            push!(new_points, firstidx)
+        end
+    end
+    for 
+    error("CONSTRUCTION ZONE: KEEP OUT")
+    return
+end

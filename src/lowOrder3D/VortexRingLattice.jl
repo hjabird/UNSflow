@@ -203,7 +203,7 @@ function steady_forces(a::VortexRingLattice,
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
-    # AND the actual maths bit:
+    # AND the actual maths bit: - Just the Kutta-Joukowski theorem.
     id, jd = size(a.vorticity)
     c = a.geometry.coordinates
     forces = map(x->Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
