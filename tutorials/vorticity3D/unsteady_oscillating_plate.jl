@@ -38,8 +38,10 @@ plate_geom = UNSflow.discretise(plate_surf, UNSflow.BilinearQuadSurf,
 # Define some kinematics:
 # kinem = UNSflow.CoordinateTransform3D((x,t)->
 #    UNSflow.Vector3D(0, 0, 0.25*cos(t*pi)) + x)
+# kinem = UNSflow.CoordinateTransform3D((x,t)->
+#    UNSflow.Vector3D(0, 0, 0.1 * t * t) + x)
 kinem = UNSflow.CoordinateTransform3D((x,t)->
-    UNSflow.Vector3D(0, 0, 0.1 * t * t) + x)
+    UNSflow.Vector3D(t, 0, 0.1 * t * t) + x)
 # We use deepcopy since we need a "baseline" to apply the transform to.
 plate = UNSflow.VortexRingLattice(deepcopy(plate_geom))
 dt = 0.05
