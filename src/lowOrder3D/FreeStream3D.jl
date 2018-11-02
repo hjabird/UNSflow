@@ -29,6 +29,17 @@
 
 mutable struct FreeStream3D <: Vorticity3D
     velocity :: Vector3D
+
+    function FreeStream3D(a::Vector3D)
+        if !isfinite(a)
+            @warn "Non-finite free stream created."
+        end
+        new(a)
+    end
+
+    function FreeStream3D(x::Real, y::Real, z::Real)
+        new(Vector3D(x, y, z))
+    end
 end
 
 function vorticity(a::FreeStream3D)
