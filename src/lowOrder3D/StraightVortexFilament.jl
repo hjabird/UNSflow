@@ -106,7 +106,7 @@ function induced_velocity_curl(
         filament.geometry.start_coord,
         filament.geometry.end_coord,
         filament.vorticity,
-        measurement_loc
+        measurement_point
         )
 end
 
@@ -205,7 +205,7 @@ end
 function induced_velocity_curl(
     ::Type{StraightVortexFilament},
     start::Vector3D, stop::Vector3D, strength::Float64,
-    measurement_loc :: Vector3D
+    measurement_point :: Vector3D
     )
 
     r0 = stop - start

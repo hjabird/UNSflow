@@ -29,7 +29,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 let
 #= Code to make a tube stolen from G1_making_a_tube.jl ========================#
@@ -52,12 +51,13 @@ discrete_surf = UNSflow.discretise(offset_surf, UNSflow.BilinearQuad,
     disc_range, disc_range)
 
 # EXTRACTING THE TANGENTS FROM A SURFACE
+
 # We might also want to know, for example, the tangents of our surface.
 # First, we want the centre of each of the quads we discretised into:
 tang_range = (disc_range[1:end-1] .+ disc_range[2:end]) / 2
-# Its worth knowing here that Eqsurf discretises such that the y index is
-# changing the most ie: [1,1],[1,2],[1,3],[2,1],[2,2],[2,3]...
-tangent_coords = vec(reshape([[x, y] for y=tang_range,x=tang_range], :, 1))
+# Its worth knowing here that Eqsurf discretises in the same way that a Matrix
+# is converted to linear indexing.
+tangent_coords = vec(reshape([[x, y] for x=tang_range, y=tang_range], :, 1))
 # And generate our tangents:
 td1 = map(x->UNSflow.derivative(offset_surf, 1,x), tangent_coords)
 td2 = map(x->UNSflow.derivative(offset_surf, 2,x), tangent_coords)
@@ -65,14 +65,15 @@ td2 = map(x->UNSflow.derivative(offset_surf, 2,x), tangent_coords)
 areas = vec(UNSflow.area.(discrete_surf))
 
 # And save to VTK
-# We need to convert our vector of tangents to matrices...
-td1_mat = convert(Matrix{Float64}, td1)
-td2_mat = convert(Matrix{Float64}, td2)
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/G4_using_surface_props_", points, cells)
-vtkfile = WriteVTK.vtk_cell_data(vtkfile, td1_mat, "Tangentd1")
-vtkfile = WriteVTK.vtk_cell_data(vtkfile, td2_mat, "Tangentd2")
-vtkfile = WriteVTK.vtk_cell_data(vtkfile, areas, "Area")
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh()
+# Add cells returns a vector of [(cell_idx::Int64, cell_vertex_idxs[])]
+percell_cidx_pidx = UNSflow.add_cells!(mesh, discrete_surf)
+map(x->UNSflow.add_celldata!(mesh, x[1][1], "Tangentd1", x[2]),
+    zip(percell_cidx_pidx, td1))
+map(x->UNSflow.add_celldata!(mesh, x[1][1], "Tangentd2", x[2]),
+    zip(percell_cidx_pidx, td2))
+map(x->UNSflow.add_celldata!(mesh, x[1][1], "Area", x[2]),
+    zip(percell_cidx_pidx, areas))
+UNSflow.to_vtk_file(mesh, "output/G4_using_surface_props")
 
 end #let

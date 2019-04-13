@@ -33,7 +33,7 @@ mutable struct BilinearQuadSurf <: DiscreteGeometry3D
         new(a)
     end
     function BilinearQuadSurf(isize::Int, jsize::Int)
-        c = Matrix{Vector3D}(undef, (isize, jsize))
+        c = Matrix{Vector3D}(undef, (isize+1, jsize+1))
         new(c)     
     end
 end
@@ -81,22 +81,27 @@ function Base.size(a::BilinearQuadSurf)
     return (i-1, j-1)
 end
 
+function Base.size(a::BilinearQuadSurf, dir::Int)
+    s = size(a.coordinates, dir)
+    return s-1
+end
+
 function Base.length(a::BilinearQuadSurf)
     i, j = size(a.coordinates)
     return (i-1)*(j-1)
 end
 
 function Base.convert(::Type{BilinearQuad}, a::BilinearQuadSurf,
-    xidx::Int, yidx::Int)
+    iidx::Int, jidx::Int)
 
-    @assert(xidx < size(a.coordinates, 1), string("xidx of requested Bilinear",
-        "Quad was too high. Requested x index of ", xidx, 
+    @assert(iidx < size(a.coordinates, 1), string("iidx of requested Bilinear",
+        "Quad was too high. Requested i index of ", iidx, 
         " which should have been less than ", size(a.coordinates, 1), "."))
-    @assert(yidx < size(a.coordinates, 2), string("yidx of requested Bilinear",
-        "Quad was too high. Requested y index of ", yidx, 
+    @assert(jidx < size(a.coordinates, 2), string("jidx of requested Bilinear",
+        "Quad was too high. Requested j index of ", jidx, 
         " which should have been less than ", size(a.coordinates, 2), "."))
     v = a.coordinates
-    g = [v[xidx+1, yidx], v[xidx+1, yidx+1], v[xidx, yidx+1], v[xidx, yidx]]
+    g = [v[iidx+1, jidx], v[iidx+1, jidx+1], v[iidx, jidx+1], v[iidx, jidx]]
     return BilinearQuad(g)
 end
 

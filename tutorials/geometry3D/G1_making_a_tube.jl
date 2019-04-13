@@ -29,7 +29,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 # First, we're going to make a tube.
 # We'll put the linear direction in z
@@ -45,6 +44,5 @@ discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:0.1:1), collect(-1:0.2:1))
 
 # ... And now we can save it to a file:
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/G1_tube", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh(discrete_surf)
+UNSflow.to_vtk_file(mesh, "output/G1_tube")

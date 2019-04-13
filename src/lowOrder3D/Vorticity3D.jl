@@ -86,9 +86,9 @@ influence_field. Uses the forward Euler method.
 """
 function euler!(this::Vorticity3D, influence_field::Vorticity3D, dt::Real)
     state = state_vector(this)
-    dstate = state_time_derivative(this, inducing_field)
+    dstate = state_time_derivative(this, influence_field)
     state += dstate * dt
-    update_using_state_vector(this, state)
+    update_using_state_vector!(this, state)
     return
 end
 

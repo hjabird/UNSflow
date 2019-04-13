@@ -63,11 +63,11 @@ function CoordinateTransform3D()
     return t
 end
 
-function (t::CoordinateTransform3D)(x::Vector3D)
-    return t.func(x, t.time)
+function (t::CoordinateTransform3D)(x::Vector3D; time::Real=t.time)
+    return t.func(x, time)
 end
 
-function evaluate(t::CoordinateTransform3D, x::Vector3D)
+function evaluate(t::CoordinateTransform3D, x::Vector3D; time::Real=t.time)
     return t(x)
 end
 

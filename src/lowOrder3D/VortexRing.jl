@@ -166,10 +166,11 @@ function Base.push!(
             push!(a, fil, controldict)
         end
     else # As a surface...
-        blsurf = BilinearQuad(b.c1, b.c2, b.c3, b.c4)
+        bgc = b.geometry.coords
+        blsurf = BilinearQuad(bgc[1], bgc[2], bgc[3], bgc[4])
         cellidx, pointidx = add_cell!(a, blsurf)
-        add_celldata!(a, cell_idx, "Vorticity", vorticity(b))
-        add_celldata!(a, cell_idx, "Filament_vorticity", b.vorticity)
+        add_celldata!(a, cellidx, "Vorticity", vorticity(b))
+        add_celldata!(a, cellidx, "Filament_vorticity", b.vorticity)
     end
     return
 end

@@ -30,7 +30,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 let
 # Lets define the surface of a sphere such that our x[2] is the longitude
@@ -46,9 +45,8 @@ discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:0.1:1), collect(-1:0.05:1))
 
 # ... And now we can save it to a file:
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
-vtkfile = WriteVTK.vtk_grid("output/G2_bad_sphere", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+mesh = UNSflow.UnstructuredMesh(discrete_surf)
+UNSflow.to_vtk_file(mesh, "output/G2_bad_sphere")
 
 # Take a look at the file - we have a huge number of cells at the poles, and
 # fewer at the equator. A classical problem. We can do better by splitting our
@@ -60,7 +58,7 @@ z_def = x->sqrt(abs(1 - x_def(x)^2 - y_def(x)^2))
 surf = UNSflow.EquationSurf(x_def, y_def, z_def)
 discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:1/6:1), collect(-1:1/6:1))
-points, cells = UNSflow.to_VtkMesh(discrete_surf)
+mesh = UNSflow.UnstructuredMesh(discrete_surf)
 for i = 1 : 4
     z_def = x ->sin(x[2] * pi / 4)
     x_def = x->cos((x[1]+2*i) * pi/4) * cos(x[2] * pi/4)
@@ -68,7 +66,7 @@ for i = 1 : 4
     surf = UNSflow.EquationSurf(x_def, y_def, z_def)
     discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
         collect(-1:1/6:1), collect(-1:1/6:1))
-    points, cells = UNSflow.add_to_VtkMesh(points, cells, discrete_surf)
+    UNSflow.add_cells!(mesh, discrete_surf)
 end
 x_def = x->sqrt(2)/2 * x[1] * sqrt(1 - x[2]^2 / 2)
 y_def = x->sqrt(2)/2 * x[2] * sqrt(1 - x[1]^2 / 2)
@@ -76,9 +74,8 @@ z_def = x->-sqrt(abs(1 - x_def(x)^2 - y_def(x)^2))
 surf = UNSflow.EquationSurf(x_def, y_def, z_def)
 discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
     collect(-1:1/6:1), collect(-1:1/6:1))
-points, cells = UNSflow.add_to_VtkMesh(points, cells, discrete_surf)
 
-vtkfile = WriteVTK.vtk_grid("output/G2_good_sphere", points, cells)
-outfiles = WriteVTK.vtk_save(vtkfile)
+UNSflow.add_cells!(mesh, discrete_surf)
+UNSflow.to_vtk_file(mesh, "output/G2_good_sphere")
 
 end #let

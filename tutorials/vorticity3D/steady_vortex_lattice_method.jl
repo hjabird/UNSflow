@@ -44,7 +44,7 @@ surf_fn_aoa = x->UNSflow.rotate_about_y(surf_fn(x), aoa)
 # The generate the surface and discretise the surface:
 wing_surf = UNSflow.EquationSurf(surf_fn_aoa)
 spanwise_disc = map(x->cbrt(x), -1:0.1:1)
-chordwise_disc = map(x->x, -1 : 0.125 : 1)
+chordwise_disc = map(x->x, -1 : 0.125: 1)
 wing_geom = UNSflow.discretise(wing_surf, UNSflow.BilinearQuadSurf, 
                                                 chordwise_disc, spanwise_disc)
 
@@ -65,15 +65,15 @@ end
 
 # STEP 4: Post-process ---------------------------------------------------------
 # We need the induced velocity to caluclate the forces on the lattice:
-ind_vel_fn = x -> free_stream + 
-    UNSflow.induced_velocity(problem.variable_aero, x)
+ind_vel_fn = x -> UNSflow.induced_velocity(
+        UNSflow.vorticities(problem.problem), x)
 # We can calculate some useful stuff using steady_loads:
 force, moment, pressure_wing = UNSflow.steady_loads(
-    problem.variable_aero[1], 
+    problem.problem.variable_vorticities[1], 
     ind_vel_fn; 
     # The wing vortex lattice is overlapped by that of the wake, so we need to 
     # correct for that - imax indicates the maximum i index of the lattice.
-    imax_filament_strs=-problem.variable_aero[2].vorticity[1,:])
+    imax_filament_strs=-problem.problem.variable_vorticities[2].vorticity[1,:])
 
 # Print out some useful things:
 println("Wing area is ", UNSflow.area(wing_geom))
@@ -83,29 +83,16 @@ println("Force coeffs ", 2 * force /
 println("Moments are ", moment)
 
 # STEP 5: Output to VTK file ---------------------------------------------------
-pressure_wake = zeros(length(problem.variable_aero[2].vorticity))
+pressure_wake = zeros(length(problem.problem.variable_vorticities[2].vorticity))
 
 mesh = UNSflow.UnstructuredMesh()
 extra_data = UNSflow.MeshDataLinker()
-UNSflow.add_celldata!(extra_data, problem.variable_aero[1], "Pressure", pressure_wing)
-UNSflow.add_celldata!(extra_data, problem.variable_aero[2], "Pressure", pressure_wake)
-push!(mesh, problem.variable_aero)
+UNSflow.add_celldata!(extra_data, problem.problem.variable_vorticities[1], 
+    "Pressure", pressure_wing)
+UNSflow.add_celldata!(extra_data, problem.problem.variable_vorticities[2], 
+    "Pressure", pressure_wake)
+push!(mesh, problem.problem.variable_vorticities)
 UNSflow.add_data!(mesh, extra_data)
 UNSflow.to_vtk_file(mesh, "output/steady_vortex_lattice")
 
-                #=
-# And plot the shape of stuff:
-points, cells = UNSflow.to_VtkMesh(
-    convert(Vector{UNSflow.BilinearQuad}, problem.bc_geometry[1]))
-points, cells = UNSflow.add_to_VtkMesh(
-    points, cells, 
-    convert(Vector{UNSflow.BilinearQuad}, problem.variable_aero[2].geometry))
-vtkfile = WriteVTK.vtk_grid("output/steady_vortex_lattice", points, cells)
-vorticity = vcat(
-    vec(problem.variable_aero[1].vorticity), 
-    vec(problem.variable_aero[2].vorticity))
-WriteVTK.vtk_cell_data(vtkfile, vorticity, "vorticity")
-WriteVTK.vtk_cell_data(vtkfile, pressure, "pressure")
-outfiles = WriteVTK.vtk_save(vtkfile)
-=#
 end #let

@@ -64,11 +64,11 @@ function add_pointdata!(a::MeshDataLinker, dataname::String,
     point::Vector3D, value::Union{Float64, Vector3D}; 
     warn_value_overwrite::Bool=false)
     
-    if warn_value_overwrite && haskey(a.celldata, dataname) &&
+    if warn_value_overwrite && haskey(a.pointdata, dataname) &&
         haskey(a.pointdata[dataname], point)
         @warn "Overwriting pointdata."
     end
-    if !haskey(a.celldata, dataname)
+    if !haskey(a.pointdata, dataname)
         a.pointdata[dataname] = Dict{Vector3D, typeof(value)}()
     end
     a.pointdata[dataname][point] = value
@@ -77,16 +77,27 @@ end
 function add_data!(a::UnstructuredMesh, b::MeshDataLinker)
     grow_field_vectors!(a)
     # Points:
-    point_idxs = Dict{Vector3D, Int64}()
+    point_idxs = Dict{Vector3D, Vector{Int64}}()
     for i = 1 : length(a.points)
-        point_idxs[a.points[i]] = i
+        # A point may appear multiple times if redundent points are not removed.
+        pl = get!(point_idxs, a.points[i], Vector{Int64}())
+        push!(pl, i)
     end
     for field in b.pointdata
         for pnt in field[2]
+            if !haskey(a.pointdata, field[1])
+                a.pointdata[field[1]] = Vector{typeof(pnt[2])}([
+                    typeof(pnt[2]) == Vector3D ? 
+                        Vector3D(NaN, NaN, NaN) : NaN])
+                grow_field_vectors!(a)
+            end
             if haskey(point_idxs, pnt[1])
-                a.pointdata[field[1]][point_idxs[pnt[1]]] = pnt[2]
+                for idx in point_idxs[pnt[1]]
+                    a.pointdata[field[1]][idx] = pnt[2]
+                end
             end
         end
+        println(mapreduce(x->isnan(x) ? 0 : 1, +, a.pointdata[field[1]]))
     end
     # Geometry
     geometry_idxs = Dict{DiscreteGeometry3D, Int64}()
@@ -95,6 +106,12 @@ function add_data!(a::UnstructuredMesh, b::MeshDataLinker)
     end
     for field in b.celldata
         for cell in field[2]
+            if !haskey(a.celldata, field[1])
+                a.celldata[field[1]] = Vector{typeof(cell[2])}([
+                    typeof(cell[2]) == Vector3D ? 
+                        Vector3D(NaN, NaN, NaN) : NaN])
+                grow_field_vectors!(a)
+            end
             if haskey(geometry_idxs, cell[1])
                 a.celldata[field[1]][geometry_idxs[cell[1]]] = cell[2]
             end

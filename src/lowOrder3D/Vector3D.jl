@@ -222,6 +222,18 @@ function Base.:(==)(a::Vector3D, b::Vector3D)
     end
 end
 
+function Base.isequal(a::Vector3D, b::Vector3D)
+    if isequal(a.x, b.x) && isequal(a.y, b.y) && isequal(a.z, b.z)
+        return true
+    else
+        return false
+    end
+end
+
+function Base.hash(a::Vector3D, h::UInt)
+    return hash(a.x, h) + hash(a.y, UInt64(31)) + hash(a.z, UInt64(127))
+end
+
 function Base.iszero(a::Vector3D)
     if a.x == 0.0 && a.y == 0.0 && a.z == 0.0
         return true
@@ -279,6 +291,14 @@ end
 
 function Base.isfinite(a::Vector3D)
     return isfinite(a.x) && isfinite(a.y) && isfinite(a.z)
+end
+
+function Base.isnan(a::Vector3D)
+    return isnan(a.x) || isnan(a.y) || isnan(a.z)
+end
+
+function Base.isinf(a::Vector3D)
+    return isinf(a.x) || isinf(a.y) || isinf(a.z)
 end
 
 function rotate_about_x(point::Vector3D, angle :: Float64)

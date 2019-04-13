@@ -298,3 +298,14 @@ function add_pointdata!(a::MeshDataLinker, b::Vorticity3DProxy,
     add_pointdata!(a, source, dataname, data)
     return
 end
+
+function Base.print(a::Vorticity3DProxy)
+    print(typeof(a), " of ")
+    print(a.source_object)
+end
+
+function Base.println(a::Vorticity3DProxy)
+    print(typeof(a), " of ")
+    print(a.source_object)
+    print("\n")
+end

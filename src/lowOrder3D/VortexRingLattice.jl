@@ -30,7 +30,7 @@ mutable struct VortexRingLattice <: Vorticity3D
     vorticity :: Matrix{Float64}
     geometry :: BilinearQuadSurf
 
-    function VortexRingLattice(x_rings::Float64, y_rings::Float64)
+    function VortexRingLattice(x_rings::T, y_rings::S) where {T<:Int, S<:Int}
         strs = zeros(x_rings, y_rings)
         geometry = BilinearQuadSurf(x_rings, y_rings)
         new(strs, geometry)
@@ -78,6 +78,9 @@ end
 
 function induced_velocity(a::VortexRingLattice, measurement_loc::Vector3D)
     vel = Vector3D(0,0,0)
+    if length(a.vorticity) == 0
+        return vel
+    end
     id, jd = size(a.vorticity)
     c = a.geometry.coordinates
     # internal horizontal filaments
@@ -123,6 +126,9 @@ end
 
 function induced_velocity_curl(a::VortexRingLattice)
     curl = zeros(3,3)
+    if length(a.vorticity) == 0
+        return curl
+    end
     id, jd = size(a.vorticity)
     # internal horizontal filaments
     for i = 2 : id
@@ -197,7 +203,7 @@ function steady_forces(a::VortexRingLattice,
     j1_filament_strs = replacefn(j1_filament_strs, 1)
     jmax_filament_strs = replacefn(jmax_filament_strs, 1)
 
-    # AND the actual maths bit:
+    # AND the actual maths bit: - Just the Kutta-Joukowski theorem.
     id, jd = size(a.vorticity)
     c = a.geometry.coordinates
     forces = map(x->Vector3D(0,0,0), [0 for i = 1 : id, j = 1 : jd])    
@@ -246,6 +252,40 @@ function steady_forces(a::VortexRingLattice,
     return forces
 end
 
+function unsteady_forces(
+    a::VortexRingLattice, 
+    old_vort_vect::Vector{T},
+    dt::Real) where T <: Real
+
+    # Unsteady Bernoulli:
+    # (P / rho) = Q^2/2 - vref^2/2 + dpotential/dt
+    # (P / rho) = steady_result + dpotential/dt
+    # So we want the difference in potential over the top/bottom of the ring.
+    # This is approximately the rate of change of ring vorticity
+    # See Katz 13.149
+    @assert(vorticity_vector_length(a) == length(old_vort_vect),
+        string("Expected old and current vorticity vector lengths to match.",
+        " Old vector length is ", length(old_vort_vect), " and current ",
+        "vector length is ", vorticity_vector_length(a)))
+    @assert(dt != 0, string("dt cannot be equal to zero. Given value was ",
+                            dt))
+    if any(isnan.(old_vort_vect)) || any(isinf.(old_vort_vect))
+        @warn "Inf or NaN values in old vorticity vector"
+    end
+    current_vort_vector = vorticity_vector(a)
+    if any(isnan.(current_vort_vector)) || any(isinf.(current_vort_vector))
+        @warn "Inf or NaN values in current vorticity vector"
+    end
+    dvort = (vorticity_vector(a) - old_vort_vect) / dt
+    m_unsteady_pressures = dvort
+    m_areas = vec(areas(a.geometry))
+    m_normals = vec(normals(a.geometry))
+    m_forces = map(x->x[1]*unit(x[2])*x[3], 
+        zip(m_unsteady_pressures, m_normals, m_areas))
+    m_forces = reshape(m_forces, size(a.vorticity))
+    return m_forces
+end
+
 function steady_pressures(a::VortexRingLattice,
     vel_fn::Function, 
     density::Real=1;
@@ -270,6 +310,17 @@ function steady_pressures(a::VortexRingLattice,
     normal_forces = map(x->dot(x[1], x[2]), zip(mnormals, force))
     press = normal_forces ./ mareas
     return press
+end
+
+function unsteady_pressures(a::VortexRingLattice,
+    old_vort_vect::Vector{T}, dt::Real) where T <: Real
+
+    forces = unsteady_forces(a, old_vort_vect, dt)
+    m_areas = areas(a.geometry)
+    m_normals = normals(a.geometry)
+    m_press = map(x->dot(x[1], unit(x[2]))/x[3], 
+        zip(forces, m_normals, m_areas))
+    return m_press
 end
 
 function steady_loads(a::VortexRingLattice,
@@ -306,6 +357,22 @@ function steady_loads(a::VortexRingLattice,
     return total_forces, total_moment, all_pressures
 end
 
+function unsteady_loads(a::VortexRingLattice,
+    old_vort_vect::Vector{T}, dt::Real;
+    measurement_centre::Vector3D=Vector3D(0,0,0)) where T <: Real
+
+    mpress = unsteady_pressures(a, old_vort_vect, dt)
+    mforces = unsteady_forces(a, old_vort_vect, dt)
+    mareas = areas(a.geometry)
+    mcents = centres(a.geometry)
+    total_forces = sum(mforces)
+    moment_contrib = map(
+        x->cross(x[1]-measurement_centre, x[2]),
+        zip(mcents, mforces))
+    total_moment = sum(moment_contrib)
+    return total_forces, total_moment, mpress
+end
+
 function state_vector_length(a::VortexRingLattice)
     return 3 * length(a.geometry.coordinates)
 end
@@ -323,11 +390,11 @@ function update_using_state_vector!(
     this::VortexRingLattice,
     state_vect::Vector{Float64})
 
-    n = length(this.ring_vertices)
-    @assert(length(state_vector) == n * 3, string(
+    n = length(coords(this.geometry))
+    @assert(length(state_vect) == n * 3, string(
         "State vector was incorrect length. Length was ", length(state_vect),
         " but should have been ", n * 3, "."))
-    if any(isnan.(state_vect) || isinf.(state_vect))
+    if any(isnan.(state_vect)) || any(isinf.(state_vect))
         @warn "Infinite or NaN values in state vector."
     end
     for i = 1 :  n
@@ -342,9 +409,10 @@ function state_time_derivative(
     inducing_bodies::Vorticity3D)
 
     svtd = Vector{Float64}(undef, 3 * length(this.geometry.coordinates))
-    for i = 1 : length(this.ring_vertices)
-        svtd[i*3 - 2 : i*3] = convert(Vector{Float64},
-             induced_velocity(this, inducing_bodies))
+    c = coords(this.geometry)
+    for i = 1 : length(c)
+        svtd[i*3 - 2 : i*3] = 
+            convert(Vector{Float64}, induced_velocity(inducing_bodies, c[i]))
     end
     return svtd
 end
@@ -354,7 +422,9 @@ function vorticity_vector_length(this::VortexRingLattice)
 end
 
 function vorticity_vector(this::VortexRingLattice)
-    return vec(this.vorticity)
+    return deepcopy(vec(this.vorticity))
+    # Otherwise updating this.vorticity will pdate the output vorticity_vector
+    # which is no use if you were trying to store the old one for example.
 end
 
 function update_using_vorticity_vector!(
@@ -407,6 +477,20 @@ function extract_vorticity_vector_indexes(
     lookup = [ni * (j-1) + i for i = 1 : ni, j = 1 : nj]
     ret = map(x->lookup[x[1], x[2]], [(i, j) for i in i_ind, j in j_ind])
     return ret
+end
+
+function add_row!(
+    a::VortexRingLattice, 
+    points::Vector{Vector3D},
+    strengths::Vector{T}=zeros(1, size(a.coords, 2) - 1)) where T <: Real
+    coords = a.geometry.coordinates
+    @assert(size(coords, 2) == length(points), string(
+        "Dimension mismatch: size(VortRingLattice.geometry.coords, 2) must ",
+        "match length(points). length(points) = ", length(points), " and ",
+        " size(VortRingLattice.geometry.coords, 2) = ", size(coords, 2)))
+    a.geometry.coordinates = vcat(coords, reshape(points, 1, :))
+    a.vorticity = vcat(a.vorticity, reshape(strengths, 1, :))
+    return
 end
 
 #= CONVERSION FUNCTIONS ------------------------------------------------------=#
@@ -519,8 +603,8 @@ function add_celldata!(a::MeshDataLinker, b::VortexRingLattice,
         string("length(data) must equal the length(geometry) of the vortex",
             " lattice. length(data) = ",length(data)," and length(geometry) = ",
             length(b.geometry), "."))
-    
-    geom1 = vec(convert(Matrix{BilinearQuad}, b.geometry))
+
+    geom1 = convert(Vector{BilinearQuad}, b.geometry)
     geom2 = vec(map(x->x.geometry, convert(Vector{VortexRing}, b)))
     for i = 1 : length(geom1)
         add_celldata!(a, dataname, geom1[i], data[i])
@@ -551,4 +635,12 @@ function add_pointdata!(a::MeshDataLinker, b::VortexRingLattice,
         add_pointdata!(a, dataname, v[2], v[1])
     end
     return
+end
+
+function Base.print(a::VortexRingLattice)
+    print(typeof(a), " with size ", size(a.geometry), ". ")
+end
+
+function Base.println(a::VortexRingLattice)
+    print(typeof(a), " with size ", size(a.geometry), ".\n ")
 end

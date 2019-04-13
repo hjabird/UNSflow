@@ -58,3 +58,38 @@ function centre(a::DiscreteGeometry3D)
     c = coords(a)
     return sum(c) / length(c)
 end
+
+function Base.:(==)(a::DiscreteGeometry3D, b::DiscreteGeometry3D)
+    if (typeof(a) == typeof(b))
+        ca = coords(a)
+        cb = coords(b)
+        if length(ca) == length(cb)
+            if all(ca .== cb)
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Base.isequal(a::DiscreteGeometry3D, b::DiscreteGeometry3D)
+    if (typeof(a) == typeof(b))
+        ca = coords(a)
+        cb = coords(b)
+        if length(ca) == length(cb)
+            if all(isequal.(ca, cb))
+                return true
+            end
+        end
+    end
+    return false
+end
+
+function Base.hash(a::DiscreteGeometry3D)
+    c = coords(a)
+    h = hash(typeof(a))
+    for i = 1 : length(c)
+        h = hash(c[i], UInt64(i))
+    end
+    return h
+end

@@ -51,6 +51,14 @@ let
     Test.@test vecy != vecx
     Test.@test vecx != vec0
     Test.@test vecx != vec1
+    Test.@test isequal(vec1, vec1b) == true
+    Test.@test isequal(vec1, vecy) != true
+    Test.@test hash(vec1) == hash(vec1)
+    Test.@test hash(deepcopy(vec1)) == hash(vec1)
+    Test.@test hash(vec1) != hash(vecm1)
+    Test.@test hash(vecx) != hash(vecy)
+    Test.@test hash(vec1) == hash(vec1b)
+    Test.@test hash(vecx) != hash(vecx, UInt64(1))
 
     # Conversions
     Test.@test convert(Vector{Float64}, vec1) == [1.,1.,1.]

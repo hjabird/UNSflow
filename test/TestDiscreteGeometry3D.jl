@@ -1,7 +1,7 @@
 #===============================================================================
-    G3_equationsurf_paths.jl
+    TestDiscreteGeometry3D.jl
 
-    An example of how one might pick out a path on an equation surf.
+    Tests for TestDiscreteGeometry3D stuff
 
     Initial code: HJAB 2018
 
@@ -26,34 +26,26 @@
     IN THE SOFTWARE.
 ------------------------------------------------------------------------------=#
 
-push!(LOAD_PATH,"../../src/")
+push!(LOAD_PATH, "../src/")
 import UNSflow
+import Test
 
 let
-#= Code to make a tube stolen from G1_making_a_tube.jl ========================#
-z_def = x->x[2]
-x_def = x->sin(pi * x[1])
-y_def = x->cos(pi * x[1])
-surf = UNSflow.EquationSurf(x_def, y_def, z_def)
-discrete_surf = UNSflow.discretise(surf, UNSflow.BilinearQuad,
-    collect(-1:0.1:1), collect(-1:0.2:1))
-mesh = UNSflow.UnstructuredMesh(discrete_surf)
-#= Finish making a tube =======================================================#
+    bq1 = UNSflow.BilinearQuad(UNSflow.Vector3D(0,0,0), 
+        UNSflow.Vector3D(1,0,0),  UNSflow.Vector3D(1,1,0), 
+        UNSflow.Vector3D(0,1,0))
+    bq1c = deepcopy(bq1)
+    bq2 =  UNSflow.BilinearQuad( UNSflow.Vector3D(0,0,0),  
+        UNSflow.Vector3D(-1,0,0), UNSflow.Vector3D(-1,-1,0),  
+        UNSflow.Vector3D(0,-1,0))
 
-# Lets make a path on the surface. We can define some local x coordinates
-# and y coordinates:
-xs = collect(-0.5: 0.02 : 0.7)
-ys = 0.8 * sin.(xs * pi * 4) .+ 0.1
-path = UNSflow.discretise(surf, UNSflow.PolyLine2, [xs ys])
-UNSflow.add_cells!(mesh, path)
+    Test.@test bq1 == bq1
+    Test.@test bq1 == bq1c
+    Test.@test bq1 != bq2
+    Test.@test isequal(bq1, bq1c)
+    Test.@test isequal(bq1, bq2) == false
+    Test.@test hash(bq1) == hash(bq1)
+    Test.@test hash(bq1) == hash(bq1c)
+    Test.@test hash(bq1) != hash(bq2)
+end
 
-# We can also distribute points evenly using the Spline3D class.
-xs = collect(-0.5: 0.02 : 0.7)
-ys = -0.7 * sin.(xs * pi * 3 .+ 0.5)
-spline = UNSflow.discretise(surf, UNSflow.Spline3D, [xs ys])
-vects = UNSflow.distribute(spline, 0, spline.limits[2], 300)
-UNSflow.add_cells!(mesh, map(UNSflow.Point3D, vects))
-
-# Now turn it into a vtk file...
-UNSflow.to_vtk_file(mesh, "output/G3_surface_path")
-end #let

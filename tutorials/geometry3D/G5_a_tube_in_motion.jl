@@ -29,7 +29,6 @@
 
 push!(LOAD_PATH,"../../src/")
 import UNSflow
-import WriteVTK
 
 let
 #= Code to make a tube stolen from G1_making_a_tube.jl ========================#
@@ -52,18 +51,20 @@ nsteps = 200
 dt = 4*pi / nsteps
 UNSflow.increment!(trans, dt)
 for i = 1 : nsteps
-    # We need to make a copy of the original.
-    newsurf = Vector{UNSflow.BilinearQuad}()
+    # We'll put the result straight into an UnstructuredMesh.
+    mesh = UNSflow.UnstructuredMesh()
     for subsurf in discrete_surf
         # Transform the coordinates
         newcoords = trans.(UNSflow.coords(subsurf))
-        push!(newsurf, UNSflow.BilinearQuad(newcoords))
+        cidx, pidxs = UNSflow.add_cell!(mesh, UNSflow.BilinearQuad(newcoords))
+        # And lets calculate the velocity for kicks.
+        vels = map(x->UNSflow.derivative(trans, x), UNSflow.coords(subsurf))
+        map(x->UNSflow.add_pointdata!(mesh, x[1], "Velocity", x[2]),
+            zip(pidxs, vels))
     end
     # And write to a VTK file.
-    points, cells = UNSflow.to_VtkMesh(newsurf)
     str = string("output/G5_motion_tube_", i)
-    vtkfile = WriteVTK.vtk_grid(str, points, cells)
-    outfiles = WriteVTK.vtk_save(vtkfile)
+    UNSflow.to_vtk_file(mesh, str)
     # And its easy to forget to
     UNSflow.increment!(trans, dt)
 end

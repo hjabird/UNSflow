@@ -8,15 +8,11 @@ h.bird.1@research.gla.ac.uk
 ===============================================================================#
 
 #=--------------------------- Dependencies -----------------------------------=#
-# Plotting in Julia on my PC is broken, so I have to load dependencies like
-# this. If yours works, try import UNSflow instead.
-let
-import WriteVTK  # We'll use this package to output to VTK for visualisation.
 push!(LOAD_PATH,"../../src/")
 import UNSflow
 include("VortexFlowFeatures.jl")
 
-
+let
 #---------------------------- User parameters --------------------------------=#
 # ODE integration parameters
 num_steps = 300
@@ -59,17 +55,9 @@ num_particles = length(particles)
 for i = 1 : num_steps
     # Save the current state to vtk if required
     if (i - 1) % save_every == 0
-        points = zeros(3, 0)
-        point_vorticity = zeros(3, num_particles)
-        cells = Array{WriteVTK.MeshCell, 1}(undef, 0)
-        for j = 1 : num_particles
-            points, cells = UNSflow.add_to_VtkMesh(points, cells, particles[j].geometry)
-            point_vorticity[:, j] = [particles[j].vorticity.x,
-                particles[j].vorticity.y, particles[j].vorticity.z]
-        end
-        vtkfile = WriteVTK.vtk_grid(string(basepath, i), points, cells)
-        WriteVTK.vtk_point_data(vtkfile, point_vorticity, "vorticity")
-        outfiles = WriteVTK.vtk_save(vtkfile)
+        mesh = UNSflow.UnstructuredMesh()
+        push!(mesh, particles)
+        UNSflow.to_vtk_file(mesh, string("output/sheet_rollup_", i))
     end
 
     # Calculate the next iteration
@@ -77,4 +65,4 @@ for i = 1 : num_steps
 end
 
 #=------------------- Now repeat until it doesn't blow up --------------------=#
-end
+end #let

@@ -33,7 +33,7 @@ mutable struct LinkedVorticity3DParent <: Vorticity3DProxy
 
     function LinkedVorticity3DParent(
         source_object::Vorticity3D, 
-        target_object::Vorticity3D, 
+        target_object::LinkedVorticity3DChild, 
         transformation_matrix::Matrix{T}) where T <: Real
 
         tmat = transformation_matrix

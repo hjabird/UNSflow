@@ -27,10 +27,7 @@
 ------------------------------------------------------------------------------=#
 
 mutable struct VortexLatticeMethod
-    free_stream :: Vector3D
-
-    variable_aero :: Vorticity3DSimpleCollector
-    bc_geometry :: Vector{BilinearQuadSurf}
+    problem :: NeumannProblem3D
 
     function VortexLatticeMethod(
         wing_geometry :: BilinearQuadSurf, 
@@ -56,39 +53,22 @@ mutable struct VortexLatticeMethod
         transform_mat = trailing_edge_to_wake_vorticity_transform_matrix(
             wing_aero_original, wake_aero)
         wake_child = LinkedVorticity3DChild(wake_aero)
-        aero = Vorticity3DSimpleCollector(
-            LinkedVorticity3DParent(wing_aero_original, wake_child, 
-                transform_mat),
-            wake_child
-        )
 
-        new(free_stream, aero, [wing_geometry])
+        problem = NeumannProblem3D()
+        push!(  problem.variable_vorticity,
+                LinkedVorticity3DParent(
+                    wing_aero_original, wake_child, transform_mat))
+        push!(      problem.variable_vorticity, wake_child)
+        push!(      problem.invariant_vorticity, FreeStream3D(free_stream))
+        append!(    problem.bc_points,      vec(centres(wing_geometry)))
+        append!(    problem.bc_directions,  vec(normals(wing_geometry)))
+        append!(    problem.bc_velocities,  zeros(length(problem.bc_points)))
+        new(problem)
     end
 end
 
 function solve!(a::VortexLatticeMethod)
-    s_normals = mapreduce(x->vec(normals(x)), vcat, a.bc_geometry)
-    s_centres = mapreduce(x->vec(centres(x)), vcat, a.bc_geometry)
-    
-    @assert(length(s_normals) == vorticity_vector_length(a.variable_aero),
-        string("VortexLatticeMethod: ",
-            "The number of geometric constraints does not match the ",
-            "number of variables in the system. Did you forget to add to ",
-            "the boundary conditions of the problem? There are ",
-            length(s_normals), " constraint points/normals and ",
-            vorticity_vector_length(a.variable_aero), " variables."))
-
-    mtrx = normal_velocity_influence_matrix(a.variable_aero, 
-        s_centres, s_normals)
-
-    fs_vector = map(
-        x->dot(a.free_stream, x[2]), 
-        zip(s_centres, s_normals))
-        
-    # mtrx*solution + fs_vector = 0
-    soln = (mtrx) \ (-fs_vector)
-    
-    update_using_vorticity_vector!(a.variable_aero, soln)
+    solve!(a.problem)
     return
 end
 
@@ -97,11 +77,12 @@ function relax_wake!(
     a::VortexLatticeMethod; 
     relaxation_factor::T=0.1) where T <: Real
 
-    points = a.variable_aero[2].geometry.coordinates
+    vort = a.problem.variable_vorticity
+    points = vort[2].geometry.coordinates
     for i = 2 : size(points, 1)
         vels = map(
-            x-> induced_velocity(a.variable_aero[2], x) + 
-                induced_velocity(a.variable_aero[1], x) + a.free_stream,
+            x-> induced_velocity(vort, x) + 
+                induced_velocity(a.problem.invariant_vorticity, x),
             points[i, :])
         # Forward difference:
         comparison_vect = unit.(points[i, :] - points[i-1, :])
