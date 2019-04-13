@@ -239,7 +239,7 @@ function grow_field_vectors!(a::UnstructuredMesh)
         end
     end
     for field in a.celldata
-        deficit = lenp - length(field[2])
+        deficit = lenc - length(field[2])
         if deficit > 0
             append!(field[2], fill(typeof(field[2][1]) == Vector3D ? 
                 Vector3D(NaN, NaN, NaN) : NaN, deficit))

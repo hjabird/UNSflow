@@ -520,7 +520,7 @@ function add_celldata!(a::MeshDataLinker, b::VortexRingLattice,
             " lattice. length(data) = ",length(data)," and length(geometry) = ",
             length(b.geometry), "."))
     
-    geom1 = convert(Vector{BilinearQuad}, b.geometry)
+    geom1 = vec(convert(Matrix{BilinearQuad}, b.geometry))
     geom2 = vec(map(x->x.geometry, convert(Vector{VortexRing}, b)))
     for i = 1 : length(geom1)
         add_celldata!(a, dataname, geom1[i], data[i])

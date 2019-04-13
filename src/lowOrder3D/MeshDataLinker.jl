@@ -95,7 +95,6 @@ function add_data!(a::UnstructuredMesh, b::MeshDataLinker)
     end
     for field in b.celldata
         for cell in field[2]
-            println(geometry_idxs[cell[1]])
             if haskey(geometry_idxs, cell[1])
                 a.celldata[field[1]][geometry_idxs[cell[1]]] = cell[2]
             end
